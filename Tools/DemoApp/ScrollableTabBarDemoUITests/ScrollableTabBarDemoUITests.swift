@@ -1,5 +1,7 @@
 import XCTest
 
+// XCUITest uses XCTestCase to own app launch and the automation session;
+// the package and external product-contract suites use Swift Testing.
 final class ScrollableTabBarDemoUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -17,14 +19,14 @@ final class ScrollableTabBarDemoUITests: XCTestCase {
         XCTAssertEqual(selectionLabel.label, "Selected: Overview")
         XCTAssertTrue(app.navigationBars.buttons["Demo"].exists)
 
-        let previewTab = app.descendants(matching: .any)[
-            "ScrollableTabBarDemo.Tab.preview"
-        ]
-        XCTAssertTrue(previewTab.waitForExistence(timeout: 5))
-        XCTAssertTrue(previewTab.isHittable)
-        previewTab.tap()
+        let headersTab = app.buttons[
+            "ScrollableTabBarDemo.Tab.headers"
+        ].firstMatch
+        XCTAssertTrue(headersTab.waitForExistence(timeout: 5))
+        XCTAssertTrue(headersTab.isHittable)
+        headersTab.tap()
 
-        XCTAssertEqual(selectionLabel.label, "Selected: Preview")
+        XCTAssertEqual(selectionLabel.label, "Selected: Headers")
     }
 
     @MainActor
@@ -32,18 +34,20 @@ final class ScrollableTabBarDemoUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        let responseTab = app.descendants(matching: .any)[
+        let responseTab = app.buttons[
             "ScrollableTabBarDemo.Tab.response"
-        ]
-        XCTAssertTrue(responseTab.waitForExistence(timeout: 5))
+        ].firstMatch
+        let nextPageButton = app.buttons["Next Page"].firstMatch
 
-        let navigationBar = app.navigationBars["ScrollableTabBar"]
-        XCTAssertTrue(navigationBar.waitForExistence(timeout: 5))
-
-        for _ in 0..<3 where responseTab.isHittable == false {
-            navigationBar.swipeLeft()
+        for _ in 0..<6 {
+            guard nextPageButton.exists, nextPageButton.isHittable else {
+                break
+            }
+            nextPageButton.tap()
         }
 
+        XCTAssertFalse(nextPageButton.exists && nextPageButton.isHittable)
+        XCTAssertTrue(responseTab.waitForExistence(timeout: 2))
         XCTAssertTrue(responseTab.isHittable)
         responseTab.tap()
 

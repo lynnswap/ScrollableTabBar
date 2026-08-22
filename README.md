@@ -158,7 +158,8 @@ Run package tests on an iOS Simulator:
 
 ```sh
 xcodebuild test \
-  -scheme ScrollableTabBar \
+  -workspace ScrollableTabBar.xcworkspace \
+  -scheme ScrollableTabBarTests \
   -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest'
 ```
 
@@ -170,6 +171,10 @@ xcodebuild test \
   -scheme ScrollableTabBarProductContract-Package \
   -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest'
 ```
+
+The package and external product-contract suites use Swift Testing. The demo's
+gesture automation uses XCUITest because launching and driving an application
+is owned by the XCTest UI-testing runner.
 
 `ScrollableTabBar.xcworkspace` is the combined developer entry point for the
 package and demo app. The Swift package remains the only library source of

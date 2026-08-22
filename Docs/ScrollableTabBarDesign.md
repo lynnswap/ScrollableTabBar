@@ -1,7 +1,7 @@
 # Standalone ScrollableTabBar Design
 
-Status: Proposed for the design gate  
-Branch: `codex/extract-scrollable-tab-bar`  
+Status: Accepted
+Branch: `codex/extract-scrollable-tab-bar`
 Baseline: `9a04ea93b48522f7e4c4895199dcec5016033b13`
 
 ## Scope Contract
@@ -102,12 +102,16 @@ an owner or dependency boundary.
 The demo app is a composition root, not a second implementation. It imports the
 same local library product that external apps import.
 
+The shared `ScrollableTabBarTests` scheme owns the package Test action. Keeping
+it separate from the library scheme avoids a name collision with the demo
+project's local package-product scheme inside the combined workspace.
+
 ## Workspace Decision
 
 Commit a top-level workspace because the repository will contain both the root
 package and a demo app project. The workspace is a developer entry point only:
 
-- package tests remain runnable directly from Xcode's generated package scheme;
+- package tests remain runnable from the shared `ScrollableTabBarTests` scheme;
 - the workspace does not duplicate the library as an Xcode framework target;
 - the demo project adds the app-process and XCUITest boundary that package tests
   cannot provide;

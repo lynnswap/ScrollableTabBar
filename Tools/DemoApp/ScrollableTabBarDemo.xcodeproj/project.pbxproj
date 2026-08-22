@@ -166,7 +166,7 @@
 			mainGroup = AB4D7FB73039E67B0021F2C5;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				AB4D7FE83039E7320021F2C5 /* XCLocalSwiftPackageReference "../../../ScrollableTabBar" */,
+				AB4D7FE83039E7320021F2C5 /* XCLocalSwiftPackageReference "../.." */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AB4D7FC13039E67B0021F2C5 /* Products */;
@@ -480,9 +480,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		AB4D7FE83039E7320021F2C5 /* XCLocalSwiftPackageReference "../../../ScrollableTabBar" */ = {
+		AB4D7FE83039E7320021F2C5 /* XCLocalSwiftPackageReference "../.." */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../../ScrollableTabBar;
+			relativePath = ../..;
 		};
 /* End XCLocalSwiftPackageReference section */
 

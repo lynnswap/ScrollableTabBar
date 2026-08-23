@@ -11,15 +11,21 @@ struct AdaptiveTabContentTests {
         content.render(
             selectedIndex: 2,
             isEnabled: true,
-            accessibilityLabel: "Detail Mode"
+            accessibilityLabel: "Detail Mode",
+            accessibilityIdentifier: "ScrollableTabBar.Control"
         )
 
         #expect(content.segmentedControl.selectedSegmentIndex == 2)
         #expect(content.segmentedControl.accessibilityLabel == "Detail Mode")
         #expect(content.segmentedControl.accessibilityValue == "Cookies")
+        #expect(
+            content.segmentedControl.accessibilityIdentifier
+                == "ScrollableTabBar.Control"
+        )
         #expect(content.menuButton.configuration?.title == "Cookies")
         #expect(content.menuButton.accessibilityLabel == "Detail Mode")
         #expect(content.menuButton.accessibilityValue == "Cookies")
+        #expect(content.menuButton.accessibilityIdentifier == "ScrollableTabBar.Control")
         let menuActions = content.menuButton.menu?.children.compactMap { $0 as? UIAction }
         #expect(menuActions?.map(\.title) == ["Headers", "Preview", "Cookies", "Security"])
         #expect(
@@ -44,7 +50,8 @@ struct AdaptiveTabContentTests {
         content.render(
             selectedIndex: 0,
             isEnabled: true,
-            accessibilityLabel: nil
+            accessibilityLabel: nil,
+            accessibilityIdentifier: "ScrollableTabBar.Control"
         )
 
         content.segmentedControl.selectedSegmentIndex = 3
@@ -59,7 +66,8 @@ struct AdaptiveTabContentTests {
         content.render(
             selectedIndex: 1,
             isEnabled: false,
-            accessibilityLabel: "Detail Mode"
+            accessibilityLabel: "Detail Mode",
+            accessibilityIdentifier: "ScrollableTabBar.Control"
         )
 
         #expect(content.segmentedControl.isEnabled == false)
@@ -99,7 +107,8 @@ struct AdaptiveTabContentTests {
         content.render(
             selectedIndex: 0,
             isEnabled: true,
-            accessibilityLabel: "Detail Mode"
+            accessibilityLabel: "Detail Mode",
+            accessibilityIdentifier: "ScrollableTabBar.Control"
         )
 
         let activeHeight = content.adaptiveView.intrinsicContentSize.height

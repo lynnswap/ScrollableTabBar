@@ -16,12 +16,27 @@ concurrency:
 
 jobs:
   test:
-    name: Package, Product Contract, Documentation, and Demo
+    name: ${{ matrix.job_name }}
     runs-on: macos-26
-    timeout-minutes: 30
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - job_name: Minimum iOS 18.0 Package
+            simulator_version: '18.0'
+            simulator_device: iPhone 16
+            install_runtime: true
+            full_suite: false
+          - job_name: Latest Runtime, Product Contract, Documentation, and Demo
+            simulator_version: ''
+            simulator_device: iPhone 17
+            install_runtime: false
+            full_suite: true
     env:
       XCODE_MAJOR: '26'
-      SIMULATOR_DEVICE: iPhone 17
+      SIMULATOR_VERSION: ${{ matrix.simulator_version }}
+      SIMULATOR_DEVICE: ${{ matrix.simulator_device }}
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -54,7 +69,46 @@ jobs:
           puts "Resolved Xcode: #{selected}"
           RUBY
 
-      - name: Resolve iOS Simulator
+      - name: Install and resolve minimum iOS Simulator
+        if: matrix.install_runtime
+        run: |
+          xcrun simctl list > /dev/null
+          xcodebuild -downloadPlatform iOS \
+            -buildVersion "${SIMULATOR_VERSION}" \
+            -architectureVariant arm64
+
+          ruby <<'RUBY'
+          require "json"
+
+          requested_version = ENV.fetch("SIMULATOR_VERSION")
+          requested_device = ENV.fetch("SIMULATOR_DEVICE")
+          runtimes = JSON.parse(`xcrun simctl list runtimes available --json`).fetch("runtimes")
+          runtime = runtimes.find do |candidate|
+            candidate.fetch("version") == requested_version
+          end
+          abort("No available iOS #{requested_version} runtime found") unless runtime
+
+          device_types = JSON.parse(`xcrun simctl list devicetypes --json`).fetch("devicetypes")
+          device_type = device_types.find do |candidate|
+            candidate.fetch("name") == requested_device
+          end
+          abort("No #{requested_device} device type found") unless device_type
+
+          device_name = "ScrollableTabBar iOS #{requested_version}"
+          udid = IO.popen([
+            "xcrun", "simctl", "create", device_name,
+            device_type.fetch("identifier"), runtime.fetch("identifier"),
+          ], &:read).strip
+          abort("Failed to create #{device_name}") unless $?.success? && udid.empty? == false
+
+          File.open(ENV.fetch("GITHUB_ENV"), "a") do |environment|
+            environment.puts "DESTINATION=platform=iOS Simulator,id=#{udid}"
+          end
+          puts "Resolved simulator: #{requested_device} iOS #{requested_version} (#{udid})"
+          RUBY
+
+      - name: Resolve latest iOS Simulator
+        if: ${{ ! matrix.install_runtime }}
         run: |
           ruby <<'RUBY'
           require "json"
@@ -100,6 +154,7 @@ jobs:
             -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-Package"
 
       - name: Run external product contract
+        if: matrix.full_suite
         working-directory: ContractTests
         run: |
           xcodebuild test \
@@ -109,6 +164,7 @@ jobs:
             -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-Contract"
 
       - name: Build DocC with warnings as errors
+        if: matrix.full_suite
         run: |
           xcodebuild docbuild \
             -scheme ScrollableTabBar \
@@ -118,6 +174,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       - name: Run demo UI smoke test
+        if: matrix.full_suite
         run: |
           xcodebuild test \
             -workspace ScrollableTabBar.xcworkspace \
@@ -128,6 +185,7 @@ jobs:
             -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-DemoTests"
 
       - name: Build Release demo
+        if: matrix.full_suite
         run: |
           xcodebuild build \
             -workspace ScrollableTabBar.xcworkspace \
@@ -138,6 +196,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       - name: Verify private runtime names are absent from Release binary
+        if: matrix.full_suite
         run: |
           products="${RUNNER_TEMP}/ScrollableTabBar-DemoRelease/Build/Products/Release-iphonesimulator"
           app_bundle="$(find "${products}" -type d -name 'ScrollableTabBarDemo.app' -print -quit)"

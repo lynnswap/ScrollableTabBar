@@ -9,7 +9,8 @@ protocol ScrollableTabBarContent: AnyObject {
     func render(
         selectedIndex: Int,
         isEnabled: Bool,
-        accessibilityLabel: String?
+        accessibilityLabel: String?,
+        accessibilityIdentifier: String?
     )
 
     func heightThatFits(_ size: CGSize) -> CGFloat
@@ -89,6 +90,13 @@ public final class ScrollableTabBar<ID: Hashable>: UIControl {
 
     /// The contextual accessibility label propagated to the active presentation.
     public override var accessibilityLabel: String? {
+        didSet {
+            renderContent()
+        }
+    }
+
+    /// The identifier propagated to the active presentation for UI automation.
+    public override var accessibilityIdentifier: String? {
         didSet {
             renderContent()
         }
@@ -215,7 +223,8 @@ public final class ScrollableTabBar<ID: Hashable>: UIControl {
         content.render(
             selectedIndex: selectedIndexStorage,
             isEnabled: isEnabled,
-            accessibilityLabel: accessibilityLabel
+            accessibilityLabel: accessibilityLabel,
+            accessibilityIdentifier: accessibilityIdentifier
         )
     }
 }

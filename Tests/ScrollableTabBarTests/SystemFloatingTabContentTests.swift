@@ -18,7 +18,8 @@ struct SystemFloatingTabContentTests {
         content.render(
             selectedIndex: 0,
             isEnabled: true,
-            accessibilityLabel: "Detail Mode"
+            accessibilityLabel: "Detail Mode",
+            accessibilityIdentifier: "ScrollableTabBar.Control"
         )
         window.layoutIfNeeded()
         content.view.layoutIfNeeded()
@@ -33,6 +34,10 @@ struct SystemFloatingTabContentTests {
         #expect(content.tabController.selectedTab === content.tabs[0])
         #expect(content.floatingView.accessibilityContainerType == .semanticGroup)
         #expect(content.floatingView.accessibilityLabel == "Detail Mode")
+        #expect(
+            content.floatingView.accessibilityIdentifier
+                == "ScrollableTabBar.Control"
+        )
         #expect(content.tabItemsView.contentSize.width > content.tabItemsView.bounds.width)
         #expect(
             descendants(of: content.floatingView.floatingTabBar).count {
@@ -43,7 +48,8 @@ struct SystemFloatingTabContentTests {
         content.render(
             selectedIndex: 3,
             isEnabled: true,
-            accessibilityLabel: "Detail Mode"
+            accessibilityLabel: "Detail Mode",
+            accessibilityIdentifier: "ScrollableTabBar.Control"
         )
 
         #expect(content.tabController.selectedTab === content.tabs[3])
@@ -84,7 +90,8 @@ struct SystemFloatingTabContentTests {
         content.render(
             selectedIndex: 0,
             isEnabled: true,
-            accessibilityLabel: "Detail Mode"
+            accessibilityLabel: "Detail Mode",
+            accessibilityIdentifier: "ScrollableTabBar.Control"
         )
         window.layoutIfNeeded()
         content.view.layoutIfNeeded()
@@ -103,7 +110,8 @@ struct SystemFloatingTabContentTests {
         content.render(
             selectedIndex: 0,
             isEnabled: true,
-            accessibilityLabel: "Detail Mode"
+            accessibilityLabel: "Detail Mode",
+            accessibilityIdentifier: "ScrollableTabBar.Control"
         )
 
         content.tabBarController(
@@ -117,7 +125,8 @@ struct SystemFloatingTabContentTests {
         content.render(
             selectedIndex: 2,
             isEnabled: false,
-            accessibilityLabel: "Detail Mode"
+            accessibilityLabel: "Detail Mode",
+            accessibilityIdentifier: "ScrollableTabBar.Control"
         )
         #expect(content.floatingView.isUserInteractionEnabled == false)
         #expect(content.floatingView.alpha == 0.5)

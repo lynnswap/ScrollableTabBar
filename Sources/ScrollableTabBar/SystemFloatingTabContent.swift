@@ -165,7 +165,8 @@ final class SystemFloatingTabContent: NSObject,
     func render(
         selectedIndex: Int,
         isEnabled: Bool,
-        accessibilityLabel: String?
+        accessibilityLabel: String?,
+        accessibilityIdentifier: String?
     ) {
         renderedIndex = selectedIndex
         let selectedTab = tabs[selectedIndex]
@@ -176,6 +177,7 @@ final class SystemFloatingTabContent: NSObject,
         floatingView.isUserInteractionEnabled = isEnabled
         floatingView.alpha = isEnabled ? 1 : 0.5
         floatingView.accessibilityLabel = accessibilityLabel
+        floatingView.accessibilityIdentifier = accessibilityIdentifier
         if #available(iOS 18.4, *) {
             for tab in tabs {
                 tab.isEnabled = isEnabled

@@ -44,13 +44,15 @@ final class AdaptiveTabContent: ScrollableTabBarContent {
     func render(
         selectedIndex: Int,
         isEnabled: Bool,
-        accessibilityLabel: String?
+        accessibilityLabel: String?,
+        accessibilityIdentifier: String?
     ) {
         let selectedItem = items[selectedIndex]
         segmentedControl.isEnabled = isEnabled
         segmentedControl.selectedSegmentIndex = selectedIndex
         segmentedControl.accessibilityLabel = accessibilityLabel
         segmentedControl.accessibilityValue = selectedItem.title
+        segmentedControl.accessibilityIdentifier = accessibilityIdentifier
         for index in items.indices {
             segmentedControl.setEnabled(isEnabled, forSegmentAt: index)
         }
@@ -64,6 +66,7 @@ final class AdaptiveTabContent: ScrollableTabBarContent {
         menuButton.isEnabled = isEnabled
         menuButton.accessibilityLabel = accessibilityLabel
         menuButton.accessibilityValue = selectedItem.title
+        menuButton.accessibilityIdentifier = accessibilityIdentifier
         menuButton.menu = UIMenu(
             options: .singleSelection,
             children: items.enumerated().map { index, item in

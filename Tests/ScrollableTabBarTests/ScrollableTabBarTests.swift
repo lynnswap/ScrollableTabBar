@@ -95,6 +95,31 @@ struct ScrollableTabBarTests {
     }
 
     @Test
+    func propagatesTheControlAccessibilityIdentifier() {
+        let control = makeControl(selectedID: .headers)
+
+        control.accessibilityIdentifier = "ScrollableTabBar.Control"
+
+        if let systemContent = control.content as? SystemFloatingTabContent {
+            #expect(
+                systemContent.floatingView.accessibilityIdentifier
+                    == "ScrollableTabBar.Control"
+            )
+        } else if let adaptiveContent = control.content as? AdaptiveTabContent {
+            #expect(
+                adaptiveContent.segmentedControl.accessibilityIdentifier
+                    == "ScrollableTabBar.Control"
+            )
+            #expect(
+                adaptiveContent.menuButton.accessibilityIdentifier
+                    == "ScrollableTabBar.Control"
+            )
+        } else {
+            Issue.record("ScrollableTabBar selected an unknown content implementation.")
+        }
+    }
+
+    @Test
     func requestsTheNavigationContainerAvailableWidth() {
         let control = makeControl(selectedID: .headers)
 

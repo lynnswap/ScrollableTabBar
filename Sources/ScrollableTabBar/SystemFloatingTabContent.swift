@@ -47,9 +47,9 @@ enum SystemFloatingTabRuntime {
         tabController.selectedTab = tabs[selectedIndex]
 
         guard let firstTab = tabs.first,
-              firstTab.responds(to: PrivateUIKitRuntimeNames.tabModelGetterSelector),
-              let tabModel = firstTab.value(
-                forKey: PrivateUIKitRuntimeNames.tabModelGetterKey
+              firstTab.responds(to: PrivateUIKitRuntimeNames.itemModelReadSelector),
+              let model = firstTab.value(
+                forKey: PrivateUIKitRuntimeNames.itemModelReadKey
               ) as AnyObject? else {
             scrollableTabBarLogger.error(
                 "UITab did not expose its configured tab model; using the public adaptive tab control."
@@ -61,13 +61,13 @@ enum SystemFloatingTabRuntime {
             baseClass: floatingTabBarClass
         )
         guard floatingTabBar.responds(
-            to: PrivateUIKitRuntimeNames.tabModelSetterSelector
+            to: PrivateUIKitRuntimeNames.attachedModelWriteSelector
         ),
               floatingTabBar.responds(
-                to: PrivateUIKitRuntimeNames.collectionViewSelector
+                to: PrivateUIKitRuntimeNames.itemsViewSelector
               ),
               floatingTabBar.responds(
-                to: PrivateUIKitRuntimeNames.showsSidebarButtonSelector
+                to: PrivateUIKitRuntimeNames.sidebarVisibilitySelector
               ) else {
             scrollableTabBarLogger.error(
                 "UIKit's floating tab bar contract changed; using the public adaptive tab control."
@@ -75,19 +75,19 @@ enum SystemFloatingTabRuntime {
             return nil
         }
         floatingTabBar.setValue(
-            tabModel,
-            forKey: PrivateUIKitRuntimeNames.attachedTabModelKey
+            model,
+            forKey: PrivateUIKitRuntimeNames.attachedModelKey
         )
 
         guard floatingTabBar.value(
-            forKey: PrivateUIKitRuntimeNames.showsSidebarButtonKey
+            forKey: PrivateUIKitRuntimeNames.sidebarVisibilityKey
         ) as? Bool == false,
               let tabItemsView = floatingTabBar.value(
-                forKey: PrivateUIKitRuntimeNames.collectionViewKey
+                forKey: PrivateUIKitRuntimeNames.itemsViewKey
               ) as? UICollectionView else {
             floatingTabBar.setValue(
                 nil,
-                forKey: PrivateUIKitRuntimeNames.attachedTabModelKey
+                forKey: PrivateUIKitRuntimeNames.attachedModelKey
             )
             scrollableTabBarLogger.error(
                 "UIKit's floating tab bar produced unexpected sidebar chrome; using the public adaptive tab control."
@@ -103,10 +103,10 @@ enum SystemFloatingTabRuntime {
         )
     }
 
-    static func detachTabModel(from floatingTabBar: UIView) {
+    static func detachModel(from floatingTabBar: UIView) {
         floatingTabBar.setValue(
             nil,
-            forKey: PrivateUIKitRuntimeNames.attachedTabModelKey
+            forKey: PrivateUIKitRuntimeNames.attachedModelKey
         )
     }
 }
@@ -158,7 +158,7 @@ final class SystemFloatingTabContent: NSObject,
 
     isolated deinit {
         tabController.delegate = nil
-        SystemFloatingTabRuntime.detachTabModel(from: floatingView.floatingTabBar)
+        SystemFloatingTabRuntime.detachModel(from: floatingView.floatingTabBar)
         tabController.tabs = []
     }
 

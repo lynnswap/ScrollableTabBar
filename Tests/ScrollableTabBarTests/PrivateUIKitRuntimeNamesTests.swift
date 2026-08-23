@@ -23,11 +23,11 @@ struct PrivateUIKitRuntimeNamesTests {
         #expect(PrivateUIKitRuntimeNames.liquidLensViewClassName == "_UILiquidLensView")
         #expect(PrivateUIKitRuntimeNames.currentPlatformMetricsSelectorName == "_currentPlatformMetrics")
         #expect(PrivateUIKitRuntimeNames.maximumContainerSizeSelectorName == "_maximumContainerSizeForPagination")
-        #expect(PrivateUIKitRuntimeNames.tabModelGetterKey == "_tabModel")
-        #expect(PrivateUIKitRuntimeNames.attachedTabModelKey == "tabModel")
-        #expect(PrivateUIKitRuntimeNames.tabModelSetterSelectorName == "setTabModel:")
-        #expect(PrivateUIKitRuntimeNames.collectionViewKey == "collectionView")
-        #expect(PrivateUIKitRuntimeNames.showsSidebarButtonKey == "showsSidebarButton")
+        #expect(PrivateUIKitRuntimeNames.itemModelReadKey == "_tabModel")
+        #expect(PrivateUIKitRuntimeNames.attachedModelKey == "tabModel")
+        #expect(PrivateUIKitRuntimeNames.attachedModelWriteSelectorName == "setTabModel:")
+        #expect(PrivateUIKitRuntimeNames.itemsViewKey == "collectionView")
+        #expect(PrivateUIKitRuntimeNames.sidebarVisibilityKey == "showsSidebarButton")
 
         #expect(
             NSStringFromSelector(PrivateUIKitRuntimeNames.currentPlatformMetricsSelector)
@@ -38,20 +38,20 @@ struct PrivateUIKitRuntimeNamesTests {
                 == PrivateUIKitRuntimeNames.maximumContainerSizeSelectorName
         )
         #expect(
-            NSStringFromSelector(PrivateUIKitRuntimeNames.tabModelGetterSelector)
-                == PrivateUIKitRuntimeNames.tabModelGetterKey
+            NSStringFromSelector(PrivateUIKitRuntimeNames.itemModelReadSelector)
+                == PrivateUIKitRuntimeNames.itemModelReadKey
         )
         #expect(
-            NSStringFromSelector(PrivateUIKitRuntimeNames.tabModelSetterSelector)
-                == PrivateUIKitRuntimeNames.tabModelSetterSelectorName
+            NSStringFromSelector(PrivateUIKitRuntimeNames.attachedModelWriteSelector)
+                == PrivateUIKitRuntimeNames.attachedModelWriteSelectorName
         )
         #expect(
-            NSStringFromSelector(PrivateUIKitRuntimeNames.collectionViewSelector)
-                == PrivateUIKitRuntimeNames.collectionViewKey
+            NSStringFromSelector(PrivateUIKitRuntimeNames.itemsViewSelector)
+                == PrivateUIKitRuntimeNames.itemsViewKey
         )
         #expect(
-            NSStringFromSelector(PrivateUIKitRuntimeNames.showsSidebarButtonSelector)
-                == PrivateUIKitRuntimeNames.showsSidebarButtonKey
+            NSStringFromSelector(PrivateUIKitRuntimeNames.sidebarVisibilitySelector)
+                == PrivateUIKitRuntimeNames.sidebarVisibilityKey
         )
     }
 }

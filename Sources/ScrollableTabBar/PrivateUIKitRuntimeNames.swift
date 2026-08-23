@@ -48,34 +48,34 @@ enum PrivateUIKitRuntimeNames {
     )
 
     // Original: _tabModel
-    static let tabModelGetterKey = decodedString([
+    static let itemModelReadKey = decodedString([
         0xF8, 0xD3, 0xC6, 0xC5, 0xEA, 0xC8, 0xC3, 0xC2, 0xCB,
     ])
-    static let tabModelGetterSelector = NSSelectorFromString(tabModelGetterKey)
+    static let itemModelReadSelector = NSSelectorFromString(itemModelReadKey)
     // Original: tabModel
-    static let attachedTabModelKey = decodedString([
+    static let attachedModelKey = decodedString([
         0xD3, 0xC6, 0xC5, 0xEA, 0xC8, 0xC3, 0xC2, 0xCB,
     ])
     // Original: setTabModel:
-    static let tabModelSetterSelectorName = decodedString([
+    static let attachedModelWriteSelectorName = decodedString([
         0xD4, 0xC2, 0xD3, 0xF3, 0xC6, 0xC5, 0xEA, 0xC8, 0xC3,
         0xC2, 0xCB, 0x9D,
     ])
-    static let tabModelSetterSelector = NSSelectorFromString(
-        tabModelSetterSelectorName
+    static let attachedModelWriteSelector = NSSelectorFromString(
+        attachedModelWriteSelectorName
     )
     // Original: collectionView
-    static let collectionViewKey = decodedString([
+    static let itemsViewKey = decodedString([
         0xC4, 0xC8, 0xCB, 0xCB, 0xC2, 0xC4, 0xD3, 0xCE, 0xC8,
         0xC9, 0xF1, 0xCE, 0xC2, 0xD0,
     ])
-    static let collectionViewSelector = NSSelectorFromString(collectionViewKey)
+    static let itemsViewSelector = NSSelectorFromString(itemsViewKey)
     // Original: showsSidebarButton
-    static let showsSidebarButtonKey = decodedString([
+    static let sidebarVisibilityKey = decodedString([
         0xD4, 0xCF, 0xC8, 0xD0, 0xD4, 0xF4, 0xCE, 0xC3, 0xC2,
         0xC5, 0xC6, 0xD5, 0xE5, 0xD2, 0xD3, 0xD3, 0xC8, 0xC9,
     ])
-    static let showsSidebarButtonSelector = NSSelectorFromString(
-        showsSidebarButtonKey
+    static let sidebarVisibilitySelector = NSSelectorFromString(
+        sidebarVisibilityKey
     )
 }

@@ -95,13 +95,34 @@ struct ScrollableTabBarTests {
     }
 
     @Test
-    func suppliesNavigationTitleViewSizing() {
+    func requestsTheNavigationContainerAvailableWidth() {
         let control = makeControl(selectedID: .headers)
 
-        #expect(control.intrinsicContentSize == CGSize(width: 640, height: 49))
+        #expect(
+            control.intrinsicContentSize
+                == CGSize(
+                    width: UIView.layoutFittingExpandedSize.width,
+                    height: 49
+                )
+        )
         #expect(
             control.sizeThatFits(CGSize(width: 314, height: 1))
                 == CGSize(width: 314, height: 49)
+        )
+        let largerProposal = CGSize(
+            width: UIView.layoutFittingExpandedSize.width + 1,
+            height: 1
+        )
+        #expect(
+            control.sizeThatFits(largerProposal)
+                == CGSize(width: largerProposal.width, height: 49)
+        )
+        #expect(
+            control.sizeThatFits(.zero)
+                == CGSize(
+                    width: UIView.layoutFittingExpandedSize.width,
+                    height: 49
+                )
         )
     }
 

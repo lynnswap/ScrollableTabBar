@@ -158,6 +158,8 @@ protocol, delegate, runtime strategy, or UIKit-private type is added.
 - User selection updates `selectedID` before sending exactly one
   `.valueChanged`; reselecting sends nothing.
 - `isEnabled == false` prevents user selection and updates presentation state.
+- The control requests expanded horizontal fitting space and honors a finite
+  container proposal without applying its own device-specific maximum.
 
 ## Consumer Code
 
@@ -190,6 +192,7 @@ initializer, `selectedID`, `isEnabled`, and target/action APIs. Neither may use
 | --- | --- |
 | Semantic item membership, order, and app content routing | Consumer |
 | Current UIKit selection projection and event delivery | `ScrollableTabBar` |
+| Final navigation-title width around other bar items | Consumer's `UINavigationBar` |
 | Stable `UITab` instances and hidden controller | `SystemFloatingTabContent` |
 | Private tab-model attach/detach | `SystemFloatingTabRuntime` |
 | Runtime-coupled identifiers and decoding | `PrivateUIKitRuntimeNames` |

@@ -28,7 +28,8 @@ struct ScrollableTabBarPresentationItem {
 ///
 /// The control uses UIKit's system floating-tab presentation when its runtime contract
 /// is available, and otherwise presents the same ordered selection through public UIKit
-/// controls. Listen for user selection with `UIControl.Event.valueChanged`.
+/// controls. The control requests the horizontal space available to a navigation title
+/// view. Listen for user selection with `UIControl.Event.valueChanged`.
 @MainActor
 public final class ScrollableTabBar<ID: Hashable>: UIControl {
     /// A tab presented by ``ScrollableTabBar``.
@@ -93,7 +94,12 @@ public final class ScrollableTabBar<ID: Hashable>: UIControl {
         }
     }
 
-    private static var preferredWidth: CGFloat { 640 }
+    // UINavigationBar may resize a custom title view around its bar items. Request
+    // the standard expanded fitting width so the container, rather than a device-specific
+    // cap, owns the final width.
+    private static var expandedFittingWidth: CGFloat {
+        UIView.layoutFittingExpandedSize.width
+    }
 
     let content: any ScrollableTabBarContent
     private let itemIndexByID: [ID: Int]
@@ -165,15 +171,15 @@ public final class ScrollableTabBar<ID: Hashable>: UIControl {
     }
 
     public override var intrinsicContentSize: CGSize {
-        CGSize(width: Self.preferredWidth, height: content.intrinsicHeight)
+        CGSize(width: Self.expandedFittingWidth, height: content.intrinsicHeight)
     }
 
     public override func sizeThatFits(_ size: CGSize) -> CGSize {
         let proposedWidth = size.width > 0 && size.width.isFinite
             ? size.width
-            : Self.preferredWidth
+            : Self.expandedFittingWidth
         return CGSize(
-            width: min(Self.preferredWidth, proposedWidth),
+            width: proposedWidth,
             height: content.heightThatFits(size)
         )
     }

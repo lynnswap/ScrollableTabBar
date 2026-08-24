@@ -9,24 +9,22 @@ let strictSwiftSettings: [SwiftSetting] = [
 ]
 
 let package = Package(
-    name: "ScrollableTabBar",
+    name: "ScrollableTabBarProductContract",
     platforms: [
         .iOS(.v18),
     ],
-    products: [
-        .library(
-            name: "ScrollableTabBar",
-            targets: ["ScrollableTabBar"]
-        ),
+    dependencies: [
+        .package(path: ".."),
     ],
     targets: [
-        .target(
-            name: "ScrollableTabBar",
-            swiftSettings: strictSwiftSettings
-        ),
         .testTarget(
-            name: "ScrollableTabBarTests",
-            dependencies: ["ScrollableTabBar"],
+            name: "ScrollableTabBarProductContractTests",
+            dependencies: [
+                .product(
+                    name: "ScrollableTabBar",
+                    package: "ScrollableTabBar"
+                ),
+            ],
             swiftSettings: strictSwiftSettings
         ),
     ]

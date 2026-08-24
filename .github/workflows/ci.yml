@@ -74,8 +74,7 @@ jobs:
         run: |
           xcrun simctl list > /dev/null
           xcodebuild -downloadPlatform iOS \
-            -buildVersion "${SIMULATOR_VERSION}" \
-            -architectureVariant arm64
+            -buildVersion "${SIMULATOR_VERSION}"
 
           ruby <<'RUBY'
           require "json"

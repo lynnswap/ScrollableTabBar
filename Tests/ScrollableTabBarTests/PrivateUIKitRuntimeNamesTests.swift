@@ -168,16 +168,6 @@ struct PrivateUIKitRuntimeNamesTests {
         )
         #expect(
             NSStringFromSelector(
-                PrivateUIKitRuntimeNames.leftEdgeEffectPocketSelector
-            ) == "leftPocket"
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.rightEdgeEffectPocketSelector
-            ) == "rightPocket"
-        )
-        #expect(
-            NSStringFromSelector(
                 PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector
             ) == "forcingPocketFor:"
         )

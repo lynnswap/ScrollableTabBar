@@ -57,10 +57,10 @@ enum ExpandedPaginationRuntime {
         "ScrollableTabBarFullWidthPaginationFloatingTabBar"
     private static let expandedCollectionViewClassName =
         "ScrollableTabBarFullWidthPaginationCollectionView"
-    private static let leftEdgeEffectPocketClassName =
-        "ScrollableTabBarLeftEdgeEffectPocketView"
-    private static let rightEdgeEffectPocketClassName =
-        "ScrollableTabBarRightEdgeEffectPocketView"
+    private static let leftAlignedEdgeEffectPocketClassName =
+        "ScrollableTabBarLeftAlignedEdgeEffectPocketView"
+    private static let rightAlignedEdgeEffectPocketClassName =
+        "ScrollableTabBarRightAlignedEdgeEffectPocketView"
     private static let expectedMaximumContainerSizeTypeEncoding =
         "{CGSize=dd}16@0:8"
     private static let expectedLayoutSubviewsTypeEncoding = "v16@0:8"
@@ -320,8 +320,6 @@ enum ExpandedPaginationRuntime {
             )
             implementation(object, layoutSelector)
             synchronizeEdgeEffectVisibility(in: object)
-            updateEdgeEffects(in: object)
-            synchronizeEdgeEffectPocketGeometry(in: object)
         }
         let layoutOverride = unsafe imp_implementationWithBlock(layoutBlock)
 
@@ -862,17 +860,12 @@ enum ExpandedPaginationRuntime {
                 selector: geometrySelector,
                 typeEncoding: expectedEdgeEffectGeometryViewSetterTypeEncoding
               ),
-              hasVerifiedEdgeEffectUpdateContract(
+              hasVerifiedEdgeEffectActivationContract(
                 on: collectionView
               ) else {
             return false
         }
 
-        leftEdgeEffect.style = .soft
-        rightEdgeEffect.style = .soft
-        // The public edge-element interaction does not establish pocket
-        // geometry in the floating-tab hierarchy. Anchor the soft effect to
-        // UIKit's native page buttons, then explicitly refresh after layout.
         unsafe unsafeBitCast(
             method_getImplementation(leftGeometryMethod),
             to: EdgeEffectGeometryViewSetter.self
@@ -889,12 +882,16 @@ enum ExpandedPaginationRuntime {
             geometrySelector,
             rightArrowButton
         )
+        leftEdgeEffect.style = .soft
+        rightEdgeEffect.style = .soft
         synchronizeEdgeEffectVisibility(in: floatingTabBar)
+        // This floating hierarchy does not request pockets from the public
+        // overlay interaction alone. Force their initial creation; the pocket
+        // subclass only reanchors UIKit's proposed field to its outside arrow.
         guard forceEdgeEffectPockets(in: floatingTabBar),
               updateEdgeEffects(in: floatingTabBar) else {
             return false
         }
-        synchronizeEdgeEffectPocketGeometry(in: floatingTabBar)
         return true
     }
 
@@ -950,7 +947,7 @@ enum ExpandedPaginationRuntime {
             rightOpacity <= minimumVisiblePageButtonOpacity
     }
 
-    private static func hasVerifiedEdgeEffectUpdateContract(
+    private static func hasVerifiedEdgeEffectActivationContract(
         on collectionView: UICollectionView
     ) -> Bool {
         let interactionSelector =
@@ -975,16 +972,6 @@ enum ExpandedPaginationRuntime {
             selector: PrivateUIKitRuntimeNames.edgeEffectUpdateSelector,
             typeEncoding: expectedVoidMethodTypeEncoding
         ) != nil,
-              unsafe verifiedMethod(
-                on: interactionType,
-                selector: PrivateUIKitRuntimeNames.leftEdgeEffectPocketSelector,
-                typeEncoding: expectedObjectGetterTypeEncoding
-              ) != nil,
-              unsafe verifiedMethod(
-                on: interactionType,
-                selector: PrivateUIKitRuntimeNames.rightEdgeEffectPocketSelector,
-                typeEncoding: expectedObjectGetterTypeEncoding
-              ) != nil,
               unsafe verifiedMethod(
                 on: interactionType,
                 selector: PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector,
@@ -1041,13 +1028,12 @@ enum ExpandedPaginationRuntime {
             to: ForceEdgeEffectPocketImplementation.self
         )
         for edge: UIRectEdge in [.left, .right] {
-            let result = implementation(
+            guard let pocket = implementation(
                 interaction,
                 forceSelector,
                 edge.rawValue
-            )
-            guard let pocket = result as? UIView,
-                  installEdgeEffectPocketClass(
+            ) as? UIView,
+                  installAlignedEdgeEffectPocketClass(
                     on: pocket,
                     edge: edge
                   ) else {
@@ -1057,108 +1043,18 @@ enum ExpandedPaginationRuntime {
         return true
     }
 
-    @discardableResult
-    private static func synchronizeEdgeEffectPocketGeometry(
-        in object: AnyObject
-    ) -> Bool {
-        let interactionSelector =
-            PrivateUIKitRuntimeNames.edgeEffectViewInteractionSelector
-        guard #available(iOS 26.0, *),
-              let floatingTabBar = object as? UIView,
-              let collectionView = collectionView(in: floatingTabBar),
-              collectionView.responds(to: interactionSelector),
-              let interaction = unsafe collectionView
-                .perform(interactionSelector)?
-                .takeUnretainedValue(),
-              let leftPageButton = view(
-                from: floatingTabBar,
-                selector: PrivateUIKitRuntimeNames.leftArrowButtonSelector
-              ),
-              let rightPageButton = view(
-                from: floatingTabBar,
-                selector: PrivateUIKitRuntimeNames.rightArrowButtonSelector
-              ),
-              let leftOpacity = pageButtonContentOpacity(
-                of: leftPageButton
-              ),
-              let rightOpacity = pageButtonContentOpacity(
-                of: rightPageButton
-              ) else {
-            return false
-        }
-
-        let configurations: [(Selector, UIRectEdge, CGFloat)] = [
-            (
-                PrivateUIKitRuntimeNames.leftEdgeEffectPocketSelector,
-                .left,
-                leftOpacity
-            ),
-            (
-                PrivateUIKitRuntimeNames.rightEdgeEffectPocketSelector,
-                .right,
-                rightOpacity
-            ),
-        ]
-        for (selector, edge, opacity) in configurations {
-            guard let pocket = view(
-                from: interaction,
-                selector: selector
-            ) else {
-                if opacity > minimumVisiblePageButtonOpacity {
-                    return false
-                }
-                continue
-            }
-            guard alignEdgeEffectPocket(
-                pocket,
-                edge: edge
-            ) else {
-                return false
-            }
-        }
-        return true
-    }
-
-    private static func alignEdgeEffectPocket(
-        _ pocket: UIView,
-        edge: UIRectEdge
-    ) -> Bool {
-        guard installEdgeEffectPocketClass(
-            on: pocket,
-            edge: edge
-        ) else {
-            return false
-        }
-
-        guard let targetFrame = pageButtonFrame(
-            for: pocket,
-            edge: edge
-        ) else {
-            return false
-        }
-        pocket.frame = targetFrame
-        let tolerance = 1 / max(
-            pocket.traitCollection.displayScale,
-            1
-        )
-        return abs(pocket.frame.minX - targetFrame.minX) <= tolerance
-            && abs(pocket.frame.minY - targetFrame.minY) <= tolerance
-            && abs(pocket.frame.width - targetFrame.width) <= tolerance
-            && abs(pocket.frame.height - targetFrame.height) <= tolerance
-    }
-
-    private static func installEdgeEffectPocketClass(
+    private static func installAlignedEdgeEffectPocketClass(
         on pocket: UIView,
         edge: UIRectEdge
     ) -> Bool {
-        let className = edgeEffectPocketClassName(for: edge)
+        let className = alignedEdgeEffectPocketClassName(for: edge)
         guard let currentClass = object_getClass(pocket) else {
             return false
         }
         if NSStringFromClass(currentClass) == className {
             return true
         }
-        guard let pocketClass = makeEdgeEffectPocketClass(
+        guard let pocketClass = makeAlignedEdgeEffectPocketClass(
             baseClass: currentClass,
             edge: edge
         ) else {
@@ -1171,11 +1067,11 @@ enum ExpandedPaginationRuntime {
         return previousClass === currentClass
     }
 
-    private static func makeEdgeEffectPocketClass(
+    private static func makeAlignedEdgeEffectPocketClass(
         baseClass: AnyClass,
         edge: UIRectEdge
     ) -> AnyClass? {
-        let className = edgeEffectPocketClassName(for: edge)
+        let className = alignedEdgeEffectPocketClassName(for: edge)
         if let existingClass = NSClassFromString(className) {
             guard class_getSuperclass(existingClass) === baseClass else {
                 scrollableTabBarLogger.fault(
@@ -1196,20 +1092,18 @@ enum ExpandedPaginationRuntime {
         }
         let originalSetFrameImplementation =
             unsafe method_getImplementation(setFrameMethod)
-        // UIKit owns the floating bar and collection geometry, and rewrites
-        // each pocket during scrolling. Constrain that native artifact at its
-        // frame owner instead of introducing a second inset or a moving mask.
         let setFrameBlock:
             @convention(block) (AnyObject, CGRect) -> Void = {
                 object,
                 proposedFrame in
-                var frame = proposedFrame
-                if let pocket = object as? UIView,
-                   let targetFrame = pageButtonFrame(
-                    for: pocket,
-                    edge: edge
-                   ) {
-                    frame = targetFrame
+                let frame = if let pocket = object as? UIView {
+                    alignedEdgeEffectPocketFrame(
+                        proposedFrame,
+                        for: pocket,
+                        edge: edge
+                    ) ?? proposedFrame
+                } else {
+                    proposedFrame
                 }
                 let implementation = unsafe unsafeBitCast(
                     originalSetFrameImplementation,
@@ -1243,19 +1137,22 @@ enum ExpandedPaginationRuntime {
         return subclass
     }
 
-    private static func edgeEffectPocketClassName(
+    private static func alignedEdgeEffectPocketClassName(
         for edge: UIRectEdge
     ) -> String {
         edge == .left
-            ? leftEdgeEffectPocketClassName
-            : rightEdgeEffectPocketClassName
+            ? leftAlignedEdgeEffectPocketClassName
+            : rightAlignedEdgeEffectPocketClassName
     }
 
-    private static func pageButtonFrame(
+    private static func alignedEdgeEffectPocketFrame(
+        _ proposedFrame: CGRect,
         for pocket: UIView,
         edge: UIRectEdge
     ) -> CGRect? {
-        guard let pocketContainer = pocket.superview,
+        guard proposedFrame.width.isFinite,
+              proposedFrame.width > 0,
+              let pocketContainer = pocket.superview,
               let collectionView = ancestorCollectionView(of: pocket),
               let floatingTabBar = floatingTabBar(
                 for: collectionView
@@ -1273,21 +1170,22 @@ enum ExpandedPaginationRuntime {
             return nil
         }
 
-        let frame = button.convert(
+        let buttonFrame = button.convert(
             button.bounds,
             to: pocketContainer
         )
-        let geometry = [
-            frame.minX,
-            frame.minY,
-            frame.width,
-            frame.height,
-        ]
-        guard geometry.allSatisfy(\.isFinite),
-              frame.width > 0,
-              frame.height > 0 else {
+        guard buttonFrame.minX.isFinite,
+              buttonFrame.maxX.isFinite else {
             return nil
         }
+
+        // The native collection viewport ends before its sibling page button.
+        // Preserve UIKit's full progressive width and vertical geometry, and
+        // move only the physical outside edge under that native button.
+        var frame = proposedFrame
+        frame.origin.x = edge == .left
+            ? buttonFrame.minX
+            : buttonFrame.maxX - proposedFrame.width
         return frame
     }
 

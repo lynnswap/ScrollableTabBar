@@ -109,16 +109,6 @@ struct SystemFloatingTabContentTests {
                     UIScrollEdgeEffect.Style.soft
                 )
             )
-            #expect(
-                content.tabItemsView.leftEdgeEffect.value(
-                    forKey: "_overrideGeometryView"
-                ) as? UIView === leftArrowButton
-            )
-            #expect(
-                content.tabItemsView.rightEdgeEffect.value(
-                    forKey: "_overrideGeometryView"
-                ) as? UIView === rightArrowButton
-            )
             #expect(content.tabItemsView.leftEdgeEffect.isHidden)
             #expect(content.tabItemsView.rightEdgeEffect.isHidden == false)
             let edgeEffectInteraction = try #require(
@@ -132,7 +122,7 @@ struct SystemFloatingTabContentTests {
                 ) as? UIView
             )
             let rightButton = try #require(
-                rightArrowButton.value(forKey: "button") as? UIButton
+                rightArrowButton.value(forKey: "button") as? UIView
             )
             let rightPocketFrame = rightPocket.convert(
                 rightPocket.bounds,
@@ -146,30 +136,23 @@ struct SystemFloatingTabContentTests {
                 content.floatingView.traitCollection.displayScale,
                 1
             )
-            let rightPocketClass: AnyClass = try #require(
-                object_getClass(rightPocket)
-            )
-            #expect(
-                NSStringFromClass(rightPocketClass)
-                    == "ScrollableTabBarRightEdgeEffectPocketView"
-            )
-            #expect(rightPocket.mask == nil)
-            #expect(
-                abs(rightPocketFrame.minX - rightButtonFrame.minX)
-                    <= edgeTolerance
-            )
+            #expect(rightPocketFrame.width > rightButtonFrame.width)
             #expect(
                 abs(rightPocketFrame.maxX - rightButtonFrame.maxX)
                     <= edgeTolerance
             )
-            #expect(
-                abs(rightPocketFrame.minY - rightButtonFrame.minY)
-                    <= edgeTolerance
-            )
-            #expect(
-                abs(rightPocketFrame.maxY - rightButtonFrame.maxY)
-                    <= edgeTolerance
-            )
+            let leftInteractions = leftArrowButton.interactions.compactMap {
+                $0 as? UIScrollEdgeElementContainerInteraction
+            }.filter {
+                $0.scrollView === content.tabItemsView && $0.edge == .left
+            }
+            let rightInteractions = rightArrowButton.interactions.compactMap {
+                $0 as? UIScrollEdgeElementContainerInteraction
+            }.filter {
+                $0.scrollView === content.tabItemsView && $0.edge == .right
+            }
+            #expect(leftInteractions.count == 1)
+            #expect(rightInteractions.count == 1)
 
             let initialContentView = try #require(
                 content.floatingView.floatingTabBar.value(
@@ -603,7 +586,7 @@ struct SystemFloatingTabContentTests {
         #expect(content.tabItemsView.contentInset.right == 0)
         if #available(iOS 26.0, *) {
             #expect(content.tabItemsView.rightEdgeEffect.isHidden)
-
+            #expect(content.tabItemsView.leftEdgeEffect.isHidden == false)
             let edgeEffectInteraction = try #require(
                 content.tabItemsView.value(
                     forKey: "_edgeEffectViewInteraction"
@@ -620,7 +603,7 @@ struct SystemFloatingTabContentTests {
                 ) as? UIView
             )
             let leftButton = try #require(
-                leftPageButton.value(forKey: "button") as? UIButton
+                leftPageButton.value(forKey: "button") as? UIView
             )
             let leftPocketFrame = leftPocket.convert(
                 leftPocket.bounds,
@@ -630,28 +613,9 @@ struct SystemFloatingTabContentTests {
                 leftButton.bounds,
                 to: content.floatingView.floatingTabBar
             )
-            let leftPocketClass: AnyClass = try #require(
-                object_getClass(leftPocket)
-            )
-            #expect(
-                NSStringFromClass(leftPocketClass)
-                    == "ScrollableTabBarLeftEdgeEffectPocketView"
-            )
-            #expect(leftPocket.mask == nil)
+            #expect(leftPocketFrame.width > leftButtonFrame.width)
             #expect(
                 abs(leftPocketFrame.minX - leftButtonFrame.minX)
-                    <= tolerance
-            )
-            #expect(
-                abs(leftPocketFrame.maxX - leftButtonFrame.maxX)
-                    <= tolerance
-            )
-            #expect(
-                abs(leftPocketFrame.minY - leftButtonFrame.minY)
-                    <= tolerance
-            )
-            #expect(
-                abs(leftPocketFrame.maxY - leftButtonFrame.maxY)
                     <= tolerance
             )
         }

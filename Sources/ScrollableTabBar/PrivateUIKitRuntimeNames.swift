@@ -202,20 +202,6 @@ enum PrivateUIKitRuntimeNames {
             0xC5, 0xD2, 0xD3, 0xD3, 0xC8, 0xC9,
         ])
     )
-    // Original: leftPocket
-    static let leftEdgeEffectPocketSelector = NSSelectorFromString(
-        decodedString([
-            0xCB, 0xC2, 0xC1, 0xD3, 0xF7, 0xC8, 0xC4, 0xCC, 0xC2,
-            0xD3,
-        ])
-    )
-    // Original: rightPocket
-    static let rightEdgeEffectPocketSelector = NSSelectorFromString(
-        decodedString([
-            0xD5, 0xCE, 0xC0, 0xCF, 0xD3, 0xF7, 0xC8, 0xC4, 0xCC,
-            0xC2, 0xD3,
-        ])
-    )
     // Original: forcingPocketFor:
     static let forceEdgeEffectPocketSelector = NSSelectorFromString(
         decodedString([

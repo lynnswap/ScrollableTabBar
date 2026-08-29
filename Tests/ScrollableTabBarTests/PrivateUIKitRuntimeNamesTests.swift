@@ -169,6 +169,11 @@ struct PrivateUIKitRuntimeNamesTests {
         )
         #expect(
             NSStringFromSelector(
+                PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector
+            ) == "forcingPocketFor:"
+        )
+        #expect(
+            NSStringFromSelector(
                 PrivateUIKitRuntimeNames.edgeEffectUpdateSelector
             ) == "update"
         )

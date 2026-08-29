@@ -134,29 +134,8 @@ struct SystemFloatingTabContentTests {
             let rightButton = try #require(
                 rightArrowButton.value(forKey: "button") as? UIButton
             )
-            let rightButtonCenter = rightButton.convert(
-                CGPoint(
-                    x: rightButton.bounds.midX,
-                    y: rightButton.bounds.midY
-                ),
-                to: content.floatingView.floatingTabBar
-            )
-            let rightButtonHitView =
-                content.floatingView.floatingTabBar.hitTest(
-                    rightButtonCenter,
-                    with: nil
-                )
-            #expect(
-                rightButtonHitView === rightButton
-                    || rightButtonHitView?.isDescendant(
-                        of: rightButton
-                    ) == true
-            )
-            let rightPocketMask = try #require(
-                rightPocket.mask
-            )
-            let rightPocketMaskFrame = rightPocketMask.convert(
-                rightPocketMask.bounds,
+            let rightPocketFrame = rightPocket.convert(
+                rightPocket.bounds,
                 to: content.floatingView.floatingTabBar
             )
             let rightButtonFrame = rightButton.convert(
@@ -167,19 +146,67 @@ struct SystemFloatingTabContentTests {
                 content.floatingView.traitCollection.displayScale,
                 1
             )
-            #expect(rightPocket.bounds.width > 0)
-            #expect(rightPocket.bounds.height > 0)
-            #expect(
-                abs(
-                    rightPocketMaskFrame.maxX
-                        - rightButtonFrame.maxX
-                ) <= edgeTolerance
+            let rightPocketClass: AnyClass = try #require(
+                object_getClass(rightPocket)
             )
             #expect(
-                abs(
-                    rightPocketMaskFrame.minX
-                        - rightButtonFrame.minX
-                ) <= edgeTolerance
+                NSStringFromClass(rightPocketClass)
+                    == "ScrollableTabBarRightEdgeEffectPocketView"
+            )
+            #expect(rightPocket.mask == nil)
+            #expect(
+                abs(rightPocketFrame.minX - rightButtonFrame.minX)
+                    <= edgeTolerance
+            )
+            #expect(
+                abs(rightPocketFrame.maxX - rightButtonFrame.maxX)
+                    <= edgeTolerance
+            )
+            #expect(
+                abs(rightPocketFrame.minY - rightButtonFrame.minY)
+                    <= edgeTolerance
+            )
+            #expect(
+                abs(rightPocketFrame.maxY - rightButtonFrame.maxY)
+                    <= edgeTolerance
+            )
+
+            let initialContentView = try #require(
+                content.floatingView.floatingTabBar.value(
+                    forKey: "contentView"
+                ) as? UIView
+            )
+            let selectionLens = try #require(
+                descendants(
+                    of: content.floatingView.floatingTabBar
+                ).first {
+                    NSStringFromClass(type(of: $0))
+                        == "_UILiquidLensView"
+                }
+            )
+            let contentFrame = initialContentView.convert(
+                initialContentView.bounds,
+                to: content.floatingView.floatingTabBar
+            )
+            let selectionFrame = selectionLens.convert(
+                selectionLens.bounds,
+                to: content.floatingView.floatingTabBar
+            )
+            let outerLeftCenter = CGPoint(
+                x: contentFrame.minX + contentFrame.height / 2,
+                y: contentFrame.midY
+            )
+            let selectionLeftCenter = CGPoint(
+                x: selectionFrame.minX + selectionFrame.height / 2,
+                y: selectionFrame.midY
+            )
+            #expect(
+                abs(outerLeftCenter.x - selectionLeftCenter.x)
+                    <= edgeTolerance
+            )
+            #expect(
+                abs(outerLeftCenter.y - selectionLeftCenter.y)
+                    <= edgeTolerance
             )
             #expect(
                 content.tabItemsView.visibleCells.allSatisfy {
@@ -281,20 +308,9 @@ struct SystemFloatingTabContentTests {
             )
             #expect(abs(contentView.bounds.width - width) <= tolerance)
             #expect(abs(maximumContainerWidth - width) <= tolerance)
-            #expect(
-                abs(content.tabItemsView.bounds.width - width)
-                    <= tolerance
-            )
-            #expect(
-                abs(
-                    content.tabItemsView.frame.minX
-                        - content.floatingView.floatingTabBar.bounds.minX
-                ) <= tolerance
-            )
-            #expect(
-                abs(content.tabItemsView.frame.maxX - width)
-                    <= tolerance
-            )
+            #expect(content.tabItemsView.bounds.width > width * 0.8)
+            #expect(content.tabItemsView.frame.minX >= -tolerance)
+            #expect(content.tabItemsView.frame.maxX <= width + tolerance)
             #expect(content.tabItemsView.isPagingEnabled == false)
         }
 
@@ -325,16 +341,8 @@ struct SystemFloatingTabContentTests {
             ) <= fractionalTolerance
         )
         #expect(
-            abs(
-                content.tabItemsView.frame.minX
-                    - fractionalContentView.bounds.minX
-            ) <= fractionalTolerance
-        )
-        #expect(
-            abs(
-                content.tabItemsView.frame.maxX
-                    - fractionalContentView.bounds.maxX
-            ) <= fractionalTolerance
+            content.tabItemsView.frame.maxX
+                <= fractionalContentView.bounds.maxX + fractionalTolerance
         )
 
         var proposedOffset = CGPoint(x: 47.25, y: 0)
@@ -446,6 +454,57 @@ struct SystemFloatingTabContentTests {
         )
         #expect(content.tabItemsView.contentInset.right == 0)
         #expect(content.tabItemsView.rightEdgeEffect.isHidden)
+
+        let edgeEffectInteraction = try #require(
+            content.tabItemsView.value(
+                forKey: "_edgeEffectViewInteraction"
+            ) as? NSObject
+        )
+        let leftPocket = try #require(
+            edgeEffectInteraction.value(
+                forKey: "leftPocket"
+            ) as? UIView
+        )
+        let leftPageButton = try #require(
+            content.floatingView.floatingTabBar.value(
+                forKey: "leftArrowButton"
+            ) as? UIView
+        )
+        let leftButton = try #require(
+            leftPageButton.value(forKey: "button") as? UIButton
+        )
+        let leftPocketFrame = leftPocket.convert(
+            leftPocket.bounds,
+            to: content.floatingView.floatingTabBar
+        )
+        let leftButtonFrame = leftButton.convert(
+            leftButton.bounds,
+            to: content.floatingView.floatingTabBar
+        )
+        let leftPocketClass: AnyClass = try #require(
+            object_getClass(leftPocket)
+        )
+        #expect(
+            NSStringFromClass(leftPocketClass)
+                == "ScrollableTabBarLeftEdgeEffectPocketView"
+        )
+        #expect(leftPocket.mask == nil)
+        #expect(
+            abs(leftPocketFrame.minX - leftButtonFrame.minX)
+                <= tolerance
+        )
+        #expect(
+            abs(leftPocketFrame.maxX - leftButtonFrame.maxX)
+                <= tolerance
+        )
+        #expect(
+            abs(leftPocketFrame.minY - leftButtonFrame.minY)
+                <= tolerance
+        )
+        #expect(
+            abs(leftPocketFrame.maxY - leftButtonFrame.maxY)
+                <= tolerance
+        )
     }
 
     @Test

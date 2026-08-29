@@ -11,8 +11,6 @@ enum ExpandedPaginationRuntime {
         @convention(c) (AnyObject, Selector) -> AnyObject?
     private typealias PageViewportWidthImplementation =
         @convention(c) (AnyObject, Selector, CGFloat) -> CGFloat
-    private typealias CurrentPageImplementation =
-        @convention(c) (AnyObject, Selector) -> CGFloat
     private typealias BackgroundInsetsImplementation =
         @convention(c) (AnyObject, Selector) -> UIEdgeInsets
     private typealias UpdateItemContentAlphaImplementation =
@@ -267,6 +265,7 @@ enum ExpandedPaginationRuntime {
             synchronizeCollectionGeometry(in: object)
             synchronizeEdgeEffectVisibility(in: object)
             updateEdgeEffects(in: object)
+            synchronizeEdgeEffectPocketGeometry(in: object)
         }
         let layoutOverride = unsafe imp_implementationWithBlock(layoutBlock)
 
@@ -303,25 +302,26 @@ enum ExpandedPaginationRuntime {
                     originalGestureIndexPathImplementation,
                     to: GestureIndexPathImplementation.self
                 )
-                if let originalIndexPath = implementation(
+                // UIKit's lookup is gated by its logical target page.
+                // The rendered cell geometry is authoritative once the scroll
+                // host extends beneath the native page buttons.
+                let originalIndexPath = implementation(
                     object,
                     gestureIndexPathSelector,
                     gestureRecognizer
-                ) {
-                    return originalIndexPath
-                }
+                )
                 guard let floatingTabBar = object as? UIView,
                       let collectionView = collectionView(
                         in: floatingTabBar
                       ),
-                      let indexPath = visibleItemIndexPath(
+                      let visibleIndexPath = visibleItemIndexPath(
                         for: gestureRecognizer,
                         in: collectionView,
                         within: floatingTabBar
                       ) else {
-                    return nil
+                    return originalIndexPath
                 }
-                return indexPath as NSIndexPath
+                return visibleIndexPath as NSIndexPath
             }
         let gestureIndexPathOverride = unsafe imp_implementationWithBlock(
             gestureIndexPathBlock
@@ -476,7 +476,6 @@ enum ExpandedPaginationRuntime {
                 // original last target exposes that extension as empty content.
                 return clampedContentOffset(
                     originalOffset,
-                    forPage: page,
                     in: collectionView
                 )
             }
@@ -566,46 +565,20 @@ enum ExpandedPaginationRuntime {
               let collectionView = collectionView(in: floatingTabBar),
               NSStringFromClass(type(of: collectionView))
                 == expandedCollectionViewClassName,
-              collectionView.responds(
-                to: PrivateUIKitRuntimeNames.currentPageSelector
-              ) else {
+              floatingTabBar.bounds.minX.isFinite,
+              floatingTabBar.bounds.width.isFinite,
+              floatingTabBar.bounds.width > 0 else {
             return
         }
 
-        let currentPage = unsafe unsafeBitCast(
-            collectionView.method(
-                for: PrivateUIKitRuntimeNames.currentPageSelector
-            ),
-            to: CurrentPageImplementation.self
-        )(
-            collectionView,
-            PrivateUIKitRuntimeNames.currentPageSelector
-        )
-        guard currentPage.isFinite else {
-            return
-        }
-
-        let viewportWidth = unsafe unsafeBitCast(
-            collectionView.method(
-                for: PrivateUIKitRuntimeNames.pageViewportWidthSelector
-            ),
-            to: PageViewportWidthImplementation.self
-        )(
-            collectionView,
-            PrivateUIKitRuntimeNames.pageViewportWidthSelector,
-            currentPage
-        )
-        guard viewportWidth.isFinite, viewportWidth > 0 else {
-            return
-        }
-
+        let effectHostWidth = floatingTabBar.bounds.width
         let tolerance = 1 / max(
             floatingTabBar.traitCollection.displayScale,
             1
         )
         guard isActivelyRubberBanding(
             collectionView,
-            viewportWidth: viewportWidth,
+            viewportWidth: effectHostWidth,
             tolerance: tolerance
         ) == false else {
             return
@@ -617,12 +590,23 @@ enum ExpandedPaginationRuntime {
             collectionView.contentInset = contentInset
         }
 
-        if abs(collectionView.bounds.width - viewportWidth) > tolerance {
-            // UIKit animates the arrow reservation by moving the viewport's
-            // origin. Preserve that origin while expanding only its width.
+        let needsOriginUpdate =
+            abs(
+                collectionView.frame.minX
+                    - floatingTabBar.bounds.minX
+            ) > tolerance
+        let needsWidthUpdate =
+            abs(collectionView.bounds.width - effectHostWidth) > tolerance
+        if needsOriginUpdate || needsWidthUpdate {
+            // Page layout still uses viewWidthForPageProgress:. The scroll
+            // view itself spans the floating bar so UIKit's native page
+            // buttons overlay its edge-effect pockets instead of sitting
+            // beyond them.
             var frame = collectionView.frame
-            frame.size.width = viewportWidth
+            frame.origin.x = floatingTabBar.bounds.minX
+            frame.size.width = effectHostWidth
             collectionView.frame = frame
+            collectionView.layoutIfNeeded()
         }
     }
 
@@ -650,6 +634,24 @@ enum ExpandedPaginationRuntime {
                 selector:
                     PrivateUIKitRuntimeNames.pageButtonContentOpacitySelector,
                 typeEncoding: expectedPageButtonContentOpacityTypeEncoding
+              ) != nil,
+              unsafe verifiedMethod(
+                on: type(of: leftArrowButton),
+                selector: PrivateUIKitRuntimeNames.pageButtonButtonSelector,
+                typeEncoding: expectedObjectGetterTypeEncoding
+              ) != nil,
+              unsafe verifiedMethod(
+                on: type(of: rightArrowButton),
+                selector: PrivateUIKitRuntimeNames.pageButtonButtonSelector,
+                typeEncoding: expectedObjectGetterTypeEncoding
+              ) != nil,
+              view(
+                from: leftArrowButton,
+                selector: PrivateUIKitRuntimeNames.pageButtonButtonSelector
+              ) != nil,
+              view(
+                from: rightArrowButton,
+                selector: PrivateUIKitRuntimeNames.pageButtonButtonSelector
               ) != nil else {
             return false
         }
@@ -707,7 +709,11 @@ enum ExpandedPaginationRuntime {
             rightArrowButton
         )
         synchronizeEdgeEffectVisibility(in: floatingTabBar)
-        return updateEdgeEffects(in: floatingTabBar)
+        guard updateEdgeEffects(in: floatingTabBar) else {
+            return false
+        }
+        synchronizeEdgeEffectPocketGeometry(in: floatingTabBar)
+        return true
     }
 
     @available(iOS 26.0, *)
@@ -781,11 +787,25 @@ enum ExpandedPaginationRuntime {
               ) else {
             return false
         }
-        return unsafe verifiedMethod(
-            on: type(of: interaction),
+        let interactionType: AnyClass = type(of: interaction)
+        guard unsafe verifiedMethod(
+            on: interactionType,
             selector: PrivateUIKitRuntimeNames.edgeEffectUpdateSelector,
             typeEncoding: expectedVoidMethodTypeEncoding
-        ) != nil
+        ) != nil,
+              unsafe verifiedMethod(
+                on: interactionType,
+                selector: PrivateUIKitRuntimeNames.leftEdgeEffectPocketSelector,
+                typeEncoding: expectedObjectGetterTypeEncoding
+              ) != nil,
+              unsafe verifiedMethod(
+                on: interactionType,
+                selector: PrivateUIKitRuntimeNames.rightEdgeEffectPocketSelector,
+                typeEncoding: expectedObjectGetterTypeEncoding
+              ) != nil else {
+            return false
+        }
+        return true
     }
 
     @discardableResult
@@ -809,6 +829,87 @@ enum ExpandedPaginationRuntime {
 
         _ = unsafe interaction.perform(updateSelector)
         return true
+    }
+
+    private static func synchronizeEdgeEffectPocketGeometry(
+        in object: AnyObject
+    ) {
+        let interactionSelector =
+            PrivateUIKitRuntimeNames.edgeEffectViewInteractionSelector
+        guard #available(iOS 26.0, *),
+              let floatingTabBar = object as? UIView,
+              let collectionView = collectionView(in: floatingTabBar),
+              collectionView.responds(to: interactionSelector),
+              let interaction = unsafe collectionView
+                .perform(interactionSelector)?
+                .takeUnretainedValue(),
+              let leftPageButton = view(
+                from: floatingTabBar,
+                selector: PrivateUIKitRuntimeNames.leftArrowButtonSelector
+              ),
+              let rightPageButton = view(
+                from: floatingTabBar,
+                selector: PrivateUIKitRuntimeNames.rightArrowButtonSelector
+              ),
+              let leftButton = view(
+                from: leftPageButton,
+                selector: PrivateUIKitRuntimeNames.pageButtonButtonSelector
+              ),
+              let rightButton = view(
+                from: rightPageButton,
+                selector: PrivateUIKitRuntimeNames.pageButtonButtonSelector
+              ) else {
+            return
+        }
+
+        if let leftPocket = view(
+            from: interaction,
+            selector: PrivateUIKitRuntimeNames.leftEdgeEffectPocketSelector
+        ) {
+            maskPocket(leftPocket, to: leftButton)
+        }
+        if let rightPocket = view(
+            from: interaction,
+            selector: PrivateUIKitRuntimeNames.rightEdgeEffectPocketSelector
+        ) {
+            maskPocket(rightPocket, to: rightButton)
+        }
+    }
+
+    private static func maskPocket(
+        _ pocket: UIView,
+        to pageButton: UIView
+    ) {
+        // UIKit rewrites pocket frames during scroll updates. Mask the native
+        // effect instead so its blur remains confined to the native button.
+        let pageButtonFrame = pageButton.convert(
+            pageButton.bounds,
+            to: pocket
+        )
+        let visibleFrame = pageButtonFrame.intersection(pocket.bounds)
+        let geometry = [
+            visibleFrame.minX,
+            visibleFrame.minY,
+            visibleFrame.width,
+            visibleFrame.height,
+        ]
+        guard visibleFrame.isNull == false,
+              geometry.allSatisfy(\.isFinite),
+              visibleFrame.width > 0,
+              visibleFrame.height > 0 else {
+            return
+        }
+
+        let maskView: UIView
+        if let existingMask = pocket.mask {
+            maskView = existingMask
+        } else {
+            maskView = UIView()
+            maskView.isUserInteractionEnabled = false
+            maskView.backgroundColor = .white
+            pocket.mask = maskView
+        }
+        maskView.frame = visibleFrame
     }
 
     private static func pageButtonContentOpacity(
@@ -928,16 +1029,11 @@ enum ExpandedPaginationRuntime {
 
     private static func clampedContentOffset(
         _ contentOffset: CGPoint,
-        forPage page: Int,
         in collectionView: UICollectionView
     ) -> CGPoint {
-        let viewportWidth = pageViewportWidth(
-            for: collectionView,
-            pageProgress: CGFloat(page)
-        ) ?? collectionView.bounds.width
         guard let range = naturalHorizontalScrollRange(
             in: collectionView,
-            viewportWidth: viewportWidth
+            viewportWidth: collectionView.bounds.width
         ) else {
             return contentOffset
         }
@@ -976,42 +1072,42 @@ enum ExpandedPaginationRuntime {
             )
             return clampedContentOffset(
                 originalTarget,
-                forPage: page,
                 in: collectionView
             ).x
         }
         guard targets.count > 1 else {
             return 0
         }
-
-        let increasing = targets[0] < targets[targets.count - 1]
+        // A full-width host can collapse trailing logical pages onto
+        // one physical offset. Keep the sequence monotonic and canonicalize
+        // that shared edge to the final page.
+        let firstTarget = targets[0]
+        let lastTarget = targets[targets.count - 1]
+        guard firstTarget != lastTarget else {
+            return nil
+        }
+        let increasing = firstTarget < lastTarget
         guard zip(targets, targets.dropFirst()).allSatisfy({
-            increasing ? $0.0 < $0.1 : $0.0 > $0.1
+            increasing ? $0.0 <= $0.1 : $0.0 >= $0.1
         }) else {
             return nil
         }
 
+        let targetTolerance = 1 / max(
+            collectionView.traitCollection.displayScale,
+            1
+        )
         let lastIndex = CGFloat(targets.count - 1)
         let isBeforeFirstTarget = increasing
-            ? contentOffset.x <= targets[0]
-            : contentOffset.x >= targets[0]
+            ? contentOffset.x <= firstTarget + targetTolerance
+            : contentOffset.x >= firstTarget - targetTolerance
+        let isAtOrBeyondLastTarget = increasing
+            ? contentOffset.x >= lastTarget - targetTolerance
+            : contentOffset.x <= lastTarget + targetTolerance
         let progress: CGFloat
         if isBeforeFirstTarget {
             progress = 0
-        } else if let segment = targets.indices.dropLast().first(
-            where: {
-                increasing
-                    ? contentOffset.x <= targets[$0 + 1]
-                    : contentOffset.x >= targets[$0 + 1]
-            }
-        ) {
-            let lowerTarget = targets[segment]
-            let upperTarget = targets[segment + 1]
-            progress = CGFloat(segment)
-                + (contentOffset.x - lowerTarget)
-                    / (upperTarget - lowerTarget)
-        } else {
-            let lastTarget = targets[targets.count - 1]
+        } else if isAtOrBeyondLastTarget {
             let overshoot = increasing
                 ? contentOffset.x - lastTarget
                 : lastTarget - contentOffset.x
@@ -1024,6 +1120,27 @@ enum ExpandedPaginationRuntime {
                 max(overshoot / trailingDistance, 0),
                 1
             )
+        } else if let segment = targets.indices.dropLast().first(
+            where: {
+                let lowerTarget = targets[$0]
+                let upperTarget = targets[$0 + 1]
+                guard lowerTarget != upperTarget else {
+                    return false
+                }
+                return increasing
+                    ? contentOffset.x
+                        < upperTarget - targetTolerance
+                    : contentOffset.x
+                        > upperTarget + targetTolerance
+            }
+        ) {
+            let lowerTarget = targets[segment]
+            let upperTarget = targets[segment + 1]
+            progress = CGFloat(segment)
+                + (contentOffset.x - lowerTarget)
+                    / (upperTarget - lowerTarget)
+        } else {
+            return nil
         }
 
         guard progress.isFinite else {

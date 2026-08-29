@@ -154,6 +154,21 @@ struct PrivateUIKitRuntimeNamesTests {
         )
         #expect(
             NSStringFromSelector(
+                PrivateUIKitRuntimeNames.pageButtonButtonSelector
+            ) == "button"
+        )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.leftEdgeEffectPocketSelector
+            ) == "leftPocket"
+        )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.rightEdgeEffectPocketSelector
+            ) == "rightPocket"
+        )
+        #expect(
+            NSStringFromSelector(
                 PrivateUIKitRuntimeNames.edgeEffectUpdateSelector
             ) == "update"
         )

@@ -1152,6 +1152,8 @@ enum ExpandedPaginationRuntime {
     ) -> CGRect? {
         guard proposedFrame.width.isFinite,
               proposedFrame.width > 0,
+              proposedFrame.height.isFinite,
+              proposedFrame.height > 0,
               let pocketContainer = pocket.superview,
               let collectionView = ancestorCollectionView(of: pocket),
               let floatingTabBar = floatingTabBar(
@@ -1175,17 +1177,22 @@ enum ExpandedPaginationRuntime {
             to: pocketContainer
         )
         guard buttonFrame.minX.isFinite,
-              buttonFrame.maxX.isFinite else {
+              buttonFrame.maxX.isFinite,
+              buttonFrame.width.isFinite,
+              buttonFrame.width > 0 else {
             return nil
         }
 
         // The native collection viewport ends before its sibling page button.
-        // Preserve UIKit's full progressive width and vertical geometry, and
-        // move only the physical outside edge under that native button.
+        // Do not adopt iOS 27's wider automatic field in this compact bar: one
+        // bar radius beyond the native arrow preserves the iOS 26 falloff
+        // without obscuring the adjacent item. UIKit still owns blur strength
+        // and vertical geometry while scrolling.
         var frame = proposedFrame
+        frame.size.width = buttonFrame.width + proposedFrame.height / 2
         frame.origin.x = edge == .left
             ? buttonFrame.minX
-            : buttonFrame.maxX - proposedFrame.width
+            : buttonFrame.maxX - frame.width
         return frame
     }
 

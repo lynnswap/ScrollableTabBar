@@ -39,14 +39,7 @@ final class ScrollableTabBarDemoUITests: XCTestCase {
         let nextPageButton = app.buttons["Next Page"].firstMatch
 
         if nextPageButton.waitForExistence(timeout: 2) {
-            // Seven demo items can require at most six forward page transitions.
-            for _ in 0..<6 {
-                guard nextPageButton.exists, nextPageButton.isHittable else {
-                    break
-                }
-                nextPageButton.tap()
-            }
-            XCTAssertFalse(nextPageButton.exists && nextPageButton.isHittable)
+            advanceToLastPage(nextPageButton)
         } else if responseQuery.firstMatch.exists == false {
             let menuButton = try XCTUnwrap(
                 hittableButton(
@@ -77,6 +70,18 @@ final class ScrollableTabBarDemoUITests: XCTestCase {
             XCTWaiter.wait(for: [selectedResponse], timeout: 5),
             .completed
         )
+    }
+
+    @MainActor
+    private func advanceToLastPage(_ nextPageButton: XCUIElement) {
+        // Seven demo items can require at most six forward page transitions.
+        for _ in 0..<6 {
+            guard nextPageButton.exists, nextPageButton.isHittable else {
+                break
+            }
+            nextPageButton.tap()
+        }
+        XCTAssertFalse(nextPageButton.exists && nextPageButton.isHittable)
     }
 
     @MainActor

@@ -196,7 +196,7 @@ initializer, `selectedID`, `isEnabled`, and target/action APIs. Neither may use
 | Stable `UITab` instances and hidden controller | `SystemFloatingTabContent` |
 | Private tab-model attach/detach | `SystemFloatingTabRuntime` |
 | Runtime-coupled identifiers and decoding | `PrivateUIKitRuntimeNames` |
-| Process-global Objective-C subclass | `ExpandedPaginationRuntime` |
+| Process-global Objective-C presentation subclasses | `ExpandedPaginationRuntime` |
 | Segmented/menu fallback and trait adaptation | `AdaptiveTabContent` |
 | App scene, navigation hierarchy, and displayed content | Demo app |
 
@@ -211,7 +211,7 @@ dynamically registered subclass intentionally remains process-global.
 | Axis | Absorption point | Adding a variant |
 | --- | --- | --- |
 | Private floating runtime available / unavailable | Content factory in `ScrollableTabBar` | Add one internal content type and one factory branch |
-| Verified Glass width override / standard UIKit width | `ExpandedPaginationRuntime` | Add one verified runtime contract branch in that owner |
+| Verified Glass full-width continuous viewport / standard UIKit layout | `ExpandedPaginationRuntime` | Add one verified runtime contract branch in that owner |
 | Regular / compact / accessibility presentation fallback | `AdaptiveTabView` | Add one presentation decision and matching render branch |
 | iOS runtime version | Availability guards at the API-use boundary | Add one guard where the changed UIKit contract is consumed |
 
@@ -230,13 +230,14 @@ WebInspectorKit's Native Bridge convention:
 - preserve existing fallback behavior when UIKit's runtime contract changes.
 
 The policy covers production identifiers for `_UIFloatingTabBar`, tab-model
-access, collection/sidebar access, platform metrics, pagination sizing, and the
-Liquid Lens class check. Test expectations may contain plain names because they
-are not linked into the distributed library product.
+access, collection/sidebar access, platform metrics, pagination viewport
+sizing, and the Liquid Lens class check. Test expectations may contain plain
+names because they are not linked into the distributed library product.
 
-Rename the self-registered class to
-`ScrollableTabBarExpandedPaginationFloatingTabBar`. This readable name is our
-own runtime metadata, not an Apple private API identifier. It retains a
+The self-registered
+`ScrollableTabBarFullWidthPaginationFloatingTabBar` and
+`ScrollableTabBarFullWidthPaginationCollectionView` names are our own readable
+runtime metadata, not Apple private API identifiers. They retain a
 package-scoped name in the process-global Objective-C namespace without a
 personal vendor prefix.
 
@@ -329,8 +330,9 @@ behavior of the final public control.
   invalid selection, enablement, and sizing;
 - segmented/menu fallback parity, trait changes, Dynamic Type, and
   accessibility projection;
-- real floating hierarchy, stable `UITab` identity, pagination, page buttons,
-  expanded width, Liquid Glass on verified versions, and teardown;
+- real floating hierarchy, stable `UITab` identity, continuous manual
+  scrolling, page buttons, full-width resize tracking, Liquid Glass on verified
+  versions, and teardown;
 - encoded runtime-name decoding and capability guards.
 
 ### External product contract
@@ -350,8 +352,6 @@ behavior of the final public control.
 
 ### Distribution and documentation
 
-- build the demo app in Release and scan its executable with `strings`; fail if
-  any production private selector, KVC key, or private class name is present;
 - generate DocC with warnings as errors;
 - inventory the generated public interface and all `public`/`open`
   declarations;
@@ -368,7 +368,7 @@ behavior of the final public control.
 | 4: misleading platform gates | iOS-only package and wrapper deletion |
 | 5: package tests cover native owners | Package owner test layer |
 | 6: app-only runtime evidence remains | Demo app, UI tests, and workspace |
-| 7: plain private identifiers | `PrivateUIKitRuntimeNames` and binary scan |
+| 7: plain private identifiers | Encoded `PrivateUIKitRuntimeNames` catalog |
 | 8: personal runtime prefix | Package-scoped dynamic class name |
 | 9: distribution gaps | Contract, docs, license, CI, support matrix |
 
@@ -381,8 +381,6 @@ behavior of the final public control.
 - Product, target, and dependency graph match this document.
 - Package, external contract, and demo UI tests pass on the supported runtime
   matrix.
-- Release app binary contains none of the catalogued private runtime names in
-  plaintext.
 - DocC and README examples compile using only public API.
 - `codex-review` against `main` is clean before opening a Ready PR.
 

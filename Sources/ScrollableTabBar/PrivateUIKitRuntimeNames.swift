@@ -26,7 +26,6 @@ enum PrivateUIKitRuntimeNames {
         0xF8, 0xF2, 0xEE, 0xEB, 0xCE, 0xD6, 0xD2, 0xCE, 0xC3,
         0xEB, 0xC2, 0xC9, 0xD4, 0xF1, 0xCE, 0xC2, 0xD0,
     ])
-
     // Original: _currentPlatformMetrics
     static let currentPlatformMetricsSelectorName = decodedString([
         0xF8, 0xC4, 0xD2, 0xD5, 0xD5, 0xC2, 0xC9, 0xD3, 0xF7,
@@ -46,7 +45,60 @@ enum PrivateUIKitRuntimeNames {
     static let maximumContainerSizeSelector = NSSelectorFromString(
         maximumContainerSizeSelectorName
     )
-
+    // Original: viewWidthForPageProgress:
+    static let pageViewportWidthSelectorName = decodedString([
+        0xD1, 0xCE, 0xC2, 0xD0, 0xF0, 0xCE, 0xC3, 0xD3, 0xCF,
+        0xE1, 0xC8, 0xD5, 0xF7, 0xC6, 0xC0, 0xC2, 0xF7, 0xD5,
+        0xC8, 0xC0, 0xD5, 0xC2, 0xD4, 0xD4, 0x9D,
+    ])
+    static let pageViewportWidthSelector = NSSelectorFromString(
+        pageViewportWidthSelectorName
+    )
+    // Original: pages
+    static let pagesSelectorName = decodedString([
+        0xD7, 0xC6, 0xC0, 0xC2, 0xD4,
+    ])
+    static let pagesSelector = NSSelectorFromString(pagesSelectorName)
+    // Original: currentPage
+    static let currentPageSelectorName = decodedString([
+        0xC4, 0xD2, 0xD5, 0xD5, 0xC2, 0xC9, 0xD3, 0xF7, 0xC6,
+        0xC0, 0xC2,
+    ])
+    static let currentPageSelector = NSSelectorFromString(
+        currentPageSelectorName
+    )
+    // Original: leftArrowButton
+    static let leftArrowButtonSelectorName = decodedString([
+        0xCB, 0xC2, 0xC1, 0xD3, 0xE6, 0xD5, 0xD5, 0xC8,
+        0xD0, 0xE5, 0xD2, 0xD3, 0xD3, 0xC8, 0xC9,
+    ])
+    static let leftArrowButtonSelector = NSSelectorFromString(
+        leftArrowButtonSelectorName
+    )
+    // Original: rightArrowButton
+    static let rightArrowButtonSelectorName = decodedString([
+        0xD5, 0xCE, 0xC0, 0xCF, 0xD3, 0xE6, 0xD5, 0xD5,
+        0xC8, 0xD0, 0xE5, 0xD2, 0xD3, 0xD3, 0xC8, 0xC9,
+    ])
+    static let rightArrowButtonSelector = NSSelectorFromString(
+        rightArrowButtonSelectorName
+    )
+    // Original: backgroundInsets
+    static let backgroundInsetsSelectorName = decodedString([
+        0xC5, 0xC6, 0xC4, 0xCC, 0xC0, 0xD5, 0xC8, 0xD2,
+        0xC9, 0xC3, 0xEE, 0xC9, 0xD4, 0xC2, 0xD3, 0xD4,
+    ])
+    static let backgroundInsetsSelector = NSSelectorFromString(
+        backgroundInsetsSelectorName
+    )
+    // Original: floatingTabBar
+    static let floatingTabBarSelectorName = decodedString([
+        0xC1, 0xCB, 0xC8, 0xC6, 0xD3, 0xCE, 0xC9, 0xC0,
+        0xF3, 0xC6, 0xC5, 0xE5, 0xC6, 0xD5,
+    ])
+    static let floatingTabBarSelector = NSSelectorFromString(
+        floatingTabBarSelectorName
+    )
     // Original: _tabModel
     static let itemModelReadKey = decodedString([
         0xF8, 0xD3, 0xC6, 0xC5, 0xEA, 0xC8, 0xC3, 0xC2, 0xCB,

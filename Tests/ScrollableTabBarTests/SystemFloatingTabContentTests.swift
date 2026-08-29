@@ -31,7 +31,24 @@ struct SystemFloatingTabContentTests {
     }
 
     @Test
-    func usesUIKitPagingExpandedWidthAndStableTabIdentity() throws {
+    func preservesPagingOutsideTheVerifiedRuntimeBranch() {
+        let collectionView = UICollectionView(
+            frame: .zero,
+            collectionViewLayout: UICollectionViewFlowLayout()
+        )
+        collectionView.isPagingEnabled = true
+
+        #expect(
+            ExpandedPaginationRuntime.prepareCollectionView(
+                collectionView,
+                in: UIView()
+            )
+        )
+        #expect(collectionView.isPagingEnabled)
+    }
+
+    @Test
+    func usesFullWidthContinuousUIKitPresentationAndStableTabIdentity() throws {
         let content = try #require(makeContent())
         let originalTabIdentities = content.tabs.map(ObjectIdentifier.init)
         content.view.frame = CGRect(x: 0, y: 0, width: 314, height: 49)
@@ -64,6 +81,7 @@ struct SystemFloatingTabContentTests {
                 == "ScrollableTabBar.Control"
         )
         #expect(content.tabItemsView.contentSize.width > content.tabItemsView.bounds.width)
+        #expect(content.tabItemsView.isPagingEnabled == false)
         #expect(
             descendants(of: content.floatingView.floatingTabBar).count {
                 NSStringFromClass(type(of: $0)) == "_UIFloatingTabBarPageButton"
@@ -83,17 +101,208 @@ struct SystemFloatingTabContentTests {
         if #available(iOS 26.0, *) {
             #expect(
                 NSStringFromClass(type(of: content.floatingView.floatingTabBar))
-                    == "ScrollableTabBarExpandedPaginationFloatingTabBar"
+                    == "ScrollableTabBarFullWidthPaginationFloatingTabBar"
+            )
+            #expect(
+                NSStringFromClass(type(of: content.tabItemsView))
+                    == "ScrollableTabBarFullWidthPaginationCollectionView"
             )
             let maximumContainerWidth = try #require(
                 ExpandedPaginationRuntime.maximumContainerSize(
                     of: content.floatingView.floatingTabBar
                 )?.width
             )
-            #expect(maximumContainerWidth > content.floatingView.floatingTabBar.bounds.width * 0.8)
-            #expect(maximumContainerWidth < content.floatingView.floatingTabBar.bounds.width)
+            let contentView = try #require(
+                content.floatingView.floatingTabBar.value(
+                    forKey: "contentView"
+                ) as? UIView
+            )
+            let tolerance =
+                1 / content.floatingView.traitCollection.displayScale
+            #expect(
+                abs(
+                    maximumContainerWidth
+                        - content.floatingView.floatingTabBar.bounds.width
+                ) <= tolerance
+            )
+            #expect(
+                abs(
+                    contentView.bounds.width
+                        - content.floatingView.floatingTabBar.bounds.width
+                ) <= tolerance
+            )
             #expect(content.floatingView.hasLiquidLens)
         }
+    }
+
+    @Test
+    func fullWidthLayoutTracksBoundsChangesAndKeepsContinuousScrolling() throws {
+        guard #available(iOS 26.0, *) else {
+            return
+        }
+
+        let content = try #require(makeContent())
+        let host = UIViewController()
+        host.view.addSubview(content.view)
+        let window = showInWindow(host)
+        defer { window.isHidden = true }
+
+        content.render(
+            selectedIndex: 0,
+            isEnabled: true,
+            accessibilityLabel: "Detail Mode",
+            accessibilityIdentifier: "ScrollableTabBar.Control"
+        )
+
+        for width: CGFloat in [240, 360, 314] {
+            content.view.frame = CGRect(
+                x: 0,
+                y: 0,
+                width: width,
+                height: 49
+            )
+            window.layoutIfNeeded()
+            content.view.layoutIfNeeded()
+            content.floatingView.floatingTabBar.layoutIfNeeded()
+
+            let contentView = try #require(
+                content.floatingView.floatingTabBar.value(
+                    forKey: "contentView"
+                ) as? UIView
+            )
+            let maximumContainerWidth = try #require(
+                ExpandedPaginationRuntime.maximumContainerSize(
+                    of: content.floatingView.floatingTabBar
+                )?.width
+            )
+            let tolerance = 1 / max(
+                content.floatingView.traitCollection.displayScale,
+                1
+            )
+            #expect(abs(contentView.bounds.width - width) <= tolerance)
+            #expect(abs(maximumContainerWidth - width) <= tolerance)
+            #expect(content.tabItemsView.bounds.width > width * 0.8)
+            #expect(content.tabItemsView.frame.minX >= -tolerance)
+            #expect(content.tabItemsView.frame.maxX <= width + tolerance)
+            #expect(content.tabItemsView.isPagingEnabled == false)
+        }
+
+        content.tabItemsView.setContentOffset(
+            CGPoint(x: 100, y: 0),
+            animated: false
+        )
+        content.floatingView.floatingTabBar.setNeedsLayout()
+        content.floatingView.floatingTabBar.layoutIfNeeded()
+        let fractionalContentView = try #require(
+            content.floatingView.floatingTabBar.value(
+                forKey: "contentView"
+            ) as? UIView
+        )
+        let fractionalTolerance = 1 / max(
+            content.floatingView.traitCollection.displayScale,
+            1
+        )
+        #expect(
+            abs(
+                fractionalContentView.bounds.width
+                    - content.view.bounds.width
+            ) <= fractionalTolerance
+        )
+        #expect(
+            content.tabItemsView.frame.maxX
+                <= fractionalContentView.bounds.maxX + fractionalTolerance
+        )
+
+        var proposedOffset = CGPoint(x: 47.25, y: 0)
+        let expectedOffset = proposedOffset
+        unsafe content.tabItemsView.delegate?.scrollViewWillEndDragging?(
+            content.tabItemsView,
+            withVelocity: CGPoint(x: 0.75, y: 0),
+            targetContentOffset: &proposedOffset
+        )
+        #expect(proposedOffset == expectedOffset)
+    }
+
+    @Test
+    func nativePageTargetsRemainReachableAfterViewportExpansion() throws {
+        guard #available(iOS 26.0, *) else {
+            return
+        }
+
+        let content = try #require(makeContent())
+        content.view.frame = CGRect(x: 0, y: 0, width: 314, height: 49)
+        let host = UIViewController()
+        host.view.addSubview(content.view)
+        let window = showInWindow(host)
+        defer { window.isHidden = true }
+
+        content.render(
+            selectedIndex: 0,
+            isEnabled: true,
+            accessibilityLabel: "Detail Mode",
+            accessibilityIdentifier: "ScrollableTabBar.Control"
+        )
+        window.layoutIfNeeded()
+        content.view.layoutIfNeeded()
+        content.floatingView.floatingTabBar.layoutIfNeeded()
+
+        let pages = try #require(
+            content.tabItemsView.value(forKey: "pages") as? NSArray
+        )
+        #expect(pages.count > 1)
+        #expect(content.tabItemsView.contentInset.right > 0)
+
+        let incrementSelector = NSSelectorFromString(
+            "incrementTargetPage"
+        )
+        let scrollSelector = NSSelectorFromString(
+            "scrollToTargetPageAnimated:"
+        )
+        let currentPageSelector = NSSelectorFromString("currentPage")
+        typealias VoidImplementation =
+            @convention(c) (AnyObject, Selector) -> Void
+        typealias ScrollImplementation =
+            @convention(c) (AnyObject, Selector, Bool) -> Void
+        typealias CurrentPageImplementation =
+            @convention(c) (AnyObject, Selector) -> CGFloat
+
+        let increment = unsafe unsafeBitCast(
+            content.tabItemsView.method(for: incrementSelector),
+            to: VoidImplementation.self
+        )
+        let scroll = unsafe unsafeBitCast(
+            content.tabItemsView.method(for: scrollSelector),
+            to: ScrollImplementation.self
+        )
+        let currentPage = unsafe unsafeBitCast(
+            content.tabItemsView.method(for: currentPageSelector),
+            to: CurrentPageImplementation.self
+        )
+
+        for _ in 1..<pages.count {
+            increment(content.tabItemsView, incrementSelector)
+            scroll(content.tabItemsView, scrollSelector, false)
+            content.floatingView.floatingTabBar.layoutIfNeeded()
+        }
+
+        let tolerance = 1 / max(
+            content.floatingView.traitCollection.displayScale,
+            1
+        )
+        #expect(
+            abs(
+                currentPage(content.tabItemsView, currentPageSelector)
+                    - CGFloat(pages.count - 1)
+            ) <= tolerance
+        )
+        let maximumOffset =
+            content.tabItemsView.contentSize.width
+            - content.tabItemsView.bounds.width
+            + content.tabItemsView.adjustedContentInset.right
+        #expect(
+            content.tabItemsView.contentOffset.x
+                <= maximumOffset + tolerance
+        )
     }
 
     @Test

@@ -20,9 +20,43 @@ struct PrivateUIKitRuntimeNamesTests {
             PrivateUIKitRuntimeNames.floatingTabBarPlatformMetricsGlassBaseClassName
                 == "_UIFloatingTabBarPlatformMetrics_Glass"
         )
-        #expect(PrivateUIKitRuntimeNames.liquidLensViewClassName == "_UILiquidLensView")
-        #expect(PrivateUIKitRuntimeNames.currentPlatformMetricsSelectorName == "_currentPlatformMetrics")
-        #expect(PrivateUIKitRuntimeNames.maximumContainerSizeSelectorName == "_maximumContainerSizeForPagination")
+        #expect(
+            PrivateUIKitRuntimeNames.liquidLensViewClassName
+                == "_UILiquidLensView"
+        )
+        #expect(
+            PrivateUIKitRuntimeNames.currentPlatformMetricsSelectorName
+                == "_currentPlatformMetrics"
+        )
+        #expect(
+            PrivateUIKitRuntimeNames.maximumContainerSizeSelectorName
+                == "_maximumContainerSizeForPagination"
+        )
+        #expect(
+            PrivateUIKitRuntimeNames.pageViewportWidthSelectorName
+                == "viewWidthForPageProgress:"
+        )
+        #expect(PrivateUIKitRuntimeNames.pagesSelectorName == "pages")
+        #expect(
+            PrivateUIKitRuntimeNames.currentPageSelectorName
+                == "currentPage"
+        )
+        #expect(
+            PrivateUIKitRuntimeNames.leftArrowButtonSelectorName
+                == "leftArrowButton"
+        )
+        #expect(
+            PrivateUIKitRuntimeNames.rightArrowButtonSelectorName
+                == "rightArrowButton"
+        )
+        #expect(
+            PrivateUIKitRuntimeNames.backgroundInsetsSelectorName
+                == "backgroundInsets"
+        )
+        #expect(
+            PrivateUIKitRuntimeNames.floatingTabBarSelectorName
+                == "floatingTabBar"
+        )
         #expect(PrivateUIKitRuntimeNames.itemModelReadKey == "_tabModel")
         #expect(PrivateUIKitRuntimeNames.attachedModelKey == "tabModel")
         #expect(PrivateUIKitRuntimeNames.attachedModelWriteSelectorName == "setTabModel:")
@@ -34,8 +68,43 @@ struct PrivateUIKitRuntimeNamesTests {
                 == PrivateUIKitRuntimeNames.currentPlatformMetricsSelectorName
         )
         #expect(
-            NSStringFromSelector(PrivateUIKitRuntimeNames.maximumContainerSizeSelector)
-                == PrivateUIKitRuntimeNames.maximumContainerSizeSelectorName
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.maximumContainerSizeSelector
+            ) == PrivateUIKitRuntimeNames.maximumContainerSizeSelectorName
+        )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.pageViewportWidthSelector
+            ) == PrivateUIKitRuntimeNames.pageViewportWidthSelectorName
+        )
+        #expect(
+            NSStringFromSelector(PrivateUIKitRuntimeNames.pagesSelector)
+                == PrivateUIKitRuntimeNames.pagesSelectorName
+        )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.currentPageSelector
+            ) == PrivateUIKitRuntimeNames.currentPageSelectorName
+        )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.leftArrowButtonSelector
+            ) == PrivateUIKitRuntimeNames.leftArrowButtonSelectorName
+        )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.rightArrowButtonSelector
+            ) == PrivateUIKitRuntimeNames.rightArrowButtonSelectorName
+        )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.backgroundInsetsSelector
+            ) == PrivateUIKitRuntimeNames.backgroundInsetsSelectorName
+        )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.floatingTabBarSelector
+            ) == PrivateUIKitRuntimeNames.floatingTabBarSelectorName
         )
         #expect(
             NSStringFromSelector(PrivateUIKitRuntimeNames.itemModelReadSelector)

@@ -63,6 +63,14 @@ final class ScrollableTabBarDemoViewController: UIViewController {
             for: .valueChanged
         )
         navigationItem.titleView = sectionControl
+        let doneItem = UIBarButtonItem(
+            primaryAction: UIAction(
+                title: "Done",
+                image: UIImage(systemName: "checkmark")
+            ) { _ in }
+        )
+        doneItem.accessibilityIdentifier = "ScrollableTabBarDemo.Done"
+        navigationItem.rightBarButtonItem = doneItem
 
         let headingLabel = UILabel()
         headingLabel.font = .preferredFont(forTextStyle: .title1)

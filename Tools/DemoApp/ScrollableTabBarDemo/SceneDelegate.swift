@@ -12,16 +12,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             return
         }
 
-        let rootViewController = UIViewController()
-        rootViewController.title = "Demo"
-        rootViewController.view.backgroundColor = .systemBackground
-
         let navigationController = UINavigationController(
-            rootViewController: rootViewController
-        )
-        navigationController.pushViewController(
-            ScrollableTabBarDemoViewController(),
-            animated: false
+            rootViewController: ScrollableTabBarDemoViewController()
         )
 
         let window = UIWindow(windowScene: windowScene)

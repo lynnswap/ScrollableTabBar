@@ -17,7 +17,10 @@ final class ScrollableTabBarDemoUITests: XCTestCase {
         ]
         XCTAssertTrue(selectionLabel.waitForExistence(timeout: 5))
         XCTAssertEqual(selectionLabel.label, "Selected: Overview")
-        XCTAssertTrue(app.navigationBars.buttons["Demo"].exists)
+        XCTAssertTrue(
+            app.buttons["ScrollableTabBarDemo.Done"]
+                .waitForExistence(timeout: 5)
+        )
 
         let headersTab = app.buttons[
             "ScrollableTabBarDemo.Tab.headers"

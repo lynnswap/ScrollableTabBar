@@ -2,7 +2,7 @@ import ScrollableTabBar
 import UIKit
 
 @MainActor
-final class ViewController: UIViewController {
+final class ScrollableTabBarDemoViewController: UIViewController {
     private enum Section: String, CaseIterable {
         case overview
         case headers
@@ -119,4 +119,10 @@ final class ViewController: UIViewController {
         selectionLabel.text = "Selected: \(title)"
         selectionLabel.accessibilityValue = title
     }
+}
+
+#Preview {
+    UINavigationController(
+        rootViewController: ScrollableTabBarDemoViewController()
+    )
 }

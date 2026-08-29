@@ -20,7 +20,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             rootViewController: rootViewController
         )
         navigationController.pushViewController(
-            ViewController(),
+            ScrollableTabBarDemoViewController(),
             animated: false
         )
 

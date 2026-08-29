@@ -727,11 +727,13 @@ enum ExpandedPaginationRuntime {
                     originalSetContentInsetImplementation,
                     to: SetContentInsetImplementation.self
                 )
-                // The native paginated layout adds trailing inset for its
-                // narrower viewport. Our page mapping already uses the physical
-                // content extent, so allowing that transient inset creates a
-                // second scroll range and visible empty space.
+                // The factory requires zero explicit content inset, while
+                // system safe-area adjustments remain in adjustedContentInset.
+                // Our page mapping owns the horizontal range, so any horizontal
+                // inset later proposed by the paginated layout would create a
+                // second range regardless of layout direction.
                 var contentInset = proposedContentInset
+                contentInset.left = 0
                 contentInset.right = 0
                 implementation(
                     object,

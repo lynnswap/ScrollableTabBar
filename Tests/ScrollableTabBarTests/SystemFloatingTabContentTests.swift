@@ -525,6 +525,7 @@ struct SystemFloatingTabContentTests {
             content.tabItemsView.value(forKey: "pages") as? NSArray
         )
         #expect(pages.count > 2)
+        #expect(content.tabItemsView.contentInset.left == 0)
         #expect(content.tabItemsView.contentInset.right == 0)
 
         let incrementSelector = NSSelectorFromString(
@@ -583,6 +584,7 @@ struct SystemFloatingTabContentTests {
                     - maximumOffset
             ) <= tolerance
         )
+        #expect(content.tabItemsView.contentInset.left == 0)
         #expect(content.tabItemsView.contentInset.right == 0)
         if #available(iOS 26.0, *) {
             #expect(content.tabItemsView.rightEdgeEffect.isHidden)

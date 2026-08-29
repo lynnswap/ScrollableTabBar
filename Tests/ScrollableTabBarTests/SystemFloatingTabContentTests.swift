@@ -5,27 +5,27 @@ import UIKit
 @MainActor
 @Suite(.serialized)
 struct SystemFloatingTabContentTests {
-    private class GlassMetricsFixture: NSObject {}
-    private final class GlassPhoneMetricsFixture: GlassMetricsFixture {}
+    private class MetricsFixture: NSObject {}
+    private final class PhoneMetricsFixture: MetricsFixture {}
 
     @Test
-    func classifiesVerifiedGlassMetricsByInheritance() {
+    func classifiesVerifiedPlatformMetricsByInheritance() {
         #expect(
-            ExpandedPaginationRuntime.isVerifiedGlassMetrics(
-                GlassMetricsFixture(),
-                baseClass: GlassMetricsFixture.self
+            ExpandedPaginationRuntime.isVerifiedPlatformMetrics(
+                MetricsFixture(),
+                baseClass: MetricsFixture.self
             )
         )
         #expect(
-            ExpandedPaginationRuntime.isVerifiedGlassMetrics(
-                GlassPhoneMetricsFixture(),
-                baseClass: GlassMetricsFixture.self
+            ExpandedPaginationRuntime.isVerifiedPlatformMetrics(
+                PhoneMetricsFixture(),
+                baseClass: MetricsFixture.self
             )
         )
         #expect(
-            ExpandedPaginationRuntime.isVerifiedGlassMetrics(
+            ExpandedPaginationRuntime.isVerifiedPlatformMetrics(
                 NSObject(),
-                baseClass: GlassMetricsFixture.self
+                baseClass: MetricsFixture.self
             ) == false
         )
     }
@@ -225,49 +225,45 @@ struct SystemFloatingTabContentTests {
         #expect(content.tabController.selectedTab === content.tabs[3])
         #expect(content.tabs.map(ObjectIdentifier.init) == originalTabIdentities)
 
+        #expect(
+            NSStringFromClass(type(of: content.floatingView.floatingTabBar))
+                == "ScrollableTabBarFullWidthPaginationFloatingTabBar"
+        )
+        #expect(
+            NSStringFromClass(type(of: content.tabItemsView))
+                == "ScrollableTabBarFullWidthPaginationCollectionView"
+        )
+        let maximumContainerWidth = try #require(
+            ExpandedPaginationRuntime.maximumContainerSize(
+                of: content.floatingView.floatingTabBar
+            )?.width
+        )
+        let contentView = try #require(
+            content.floatingView.floatingTabBar.value(
+                forKey: "contentView"
+            ) as? UIView
+        )
+        let tolerance =
+            1 / content.floatingView.traitCollection.displayScale
+        #expect(
+            abs(
+                maximumContainerWidth
+                    - content.floatingView.floatingTabBar.bounds.width
+            ) <= tolerance
+        )
+        #expect(
+            abs(
+                contentView.bounds.width
+                    - content.floatingView.floatingTabBar.bounds.width
+            ) <= tolerance
+        )
         if #available(iOS 26.0, *) {
-            #expect(
-                NSStringFromClass(type(of: content.floatingView.floatingTabBar))
-                    == "ScrollableTabBarFullWidthPaginationFloatingTabBar"
-            )
-            #expect(
-                NSStringFromClass(type(of: content.tabItemsView))
-                    == "ScrollableTabBarFullWidthPaginationCollectionView"
-            )
-            let maximumContainerWidth = try #require(
-                ExpandedPaginationRuntime.maximumContainerSize(
-                    of: content.floatingView.floatingTabBar
-                )?.width
-            )
-            let contentView = try #require(
-                content.floatingView.floatingTabBar.value(
-                    forKey: "contentView"
-                ) as? UIView
-            )
-            let tolerance =
-                1 / content.floatingView.traitCollection.displayScale
-            #expect(
-                abs(
-                    maximumContainerWidth
-                        - content.floatingView.floatingTabBar.bounds.width
-                ) <= tolerance
-            )
-            #expect(
-                abs(
-                    contentView.bounds.width
-                        - content.floatingView.floatingTabBar.bounds.width
-                ) <= tolerance
-            )
             #expect(content.floatingView.hasLiquidLens)
         }
     }
 
     @Test
     func fullWidthLayoutTracksBoundsChangesAndKeepsContinuousScrolling() throws {
-        guard #available(iOS 26.0, *) else {
-            return
-        }
-
         let content = try #require(makeContent())
         let host = UIViewController()
         host.view.addSubview(content.view)
@@ -320,11 +316,13 @@ struct SystemFloatingTabContentTests {
         )
         content.floatingView.floatingTabBar.setNeedsLayout()
         content.floatingView.floatingTabBar.layoutIfNeeded()
-        #expect(
-            content.tabItemsView.visibleCells.allSatisfy {
-                $0.contentView.alpha == 1
-            }
-        )
+        if #available(iOS 26.0, *) {
+            #expect(
+                content.tabItemsView.visibleCells.allSatisfy {
+                    $0.contentView.alpha == 1
+                }
+            )
+        }
         let fractionalContentView = try #require(
             content.floatingView.floatingTabBar.value(
                 forKey: "contentView"
@@ -357,10 +355,6 @@ struct SystemFloatingTabContentTests {
 
     @Test
     func expandedCollectionOwnsViewportFrameMutation() throws {
-        guard #available(iOS 26.0, *) else {
-            return
-        }
-
         let content = try #require(
             makeContent(
                 titles: [
@@ -425,10 +419,6 @@ struct SystemFloatingTabContentTests {
 
     @Test
     func trailingDecelerationTargetsTheFinalPhysicalEdge() throws {
-        guard #available(iOS 26.0, *) else {
-            return
-        }
-
         let content = try #require(
             makeContent(
                 titles: [
@@ -519,10 +509,6 @@ struct SystemFloatingTabContentTests {
 
     @Test
     func pageTargetsUsePhysicalScrollRangeAndAlignLastItem() throws {
-        guard #available(iOS 26.0, *) else {
-            return
-        }
-
         let content = try #require(
             makeContent(
                 titles: [
@@ -615,66 +601,64 @@ struct SystemFloatingTabContentTests {
             ) <= tolerance
         )
         #expect(content.tabItemsView.contentInset.right == 0)
-        #expect(content.tabItemsView.rightEdgeEffect.isHidden)
+        if #available(iOS 26.0, *) {
+            #expect(content.tabItemsView.rightEdgeEffect.isHidden)
 
-        let edgeEffectInteraction = try #require(
-            content.tabItemsView.value(
-                forKey: "_edgeEffectViewInteraction"
-            ) as? NSObject
-        )
-        let leftPocket = try #require(
-            edgeEffectInteraction.value(
-                forKey: "leftPocket"
-            ) as? UIView
-        )
-        let leftPageButton = try #require(
-            content.floatingView.floatingTabBar.value(
-                forKey: "leftArrowButton"
-            ) as? UIView
-        )
-        let leftButton = try #require(
-            leftPageButton.value(forKey: "button") as? UIButton
-        )
-        let leftPocketFrame = leftPocket.convert(
-            leftPocket.bounds,
-            to: content.floatingView.floatingTabBar
-        )
-        let leftButtonFrame = leftButton.convert(
-            leftButton.bounds,
-            to: content.floatingView.floatingTabBar
-        )
-        let leftPocketClass: AnyClass = try #require(
-            object_getClass(leftPocket)
-        )
-        #expect(
-            NSStringFromClass(leftPocketClass)
-                == "ScrollableTabBarLeftEdgeEffectPocketView"
-        )
-        #expect(leftPocket.mask == nil)
-        #expect(
-            abs(leftPocketFrame.minX - leftButtonFrame.minX)
-                <= tolerance
-        )
-        #expect(
-            abs(leftPocketFrame.maxX - leftButtonFrame.maxX)
-                <= tolerance
-        )
-        #expect(
-            abs(leftPocketFrame.minY - leftButtonFrame.minY)
-                <= tolerance
-        )
-        #expect(
-            abs(leftPocketFrame.maxY - leftButtonFrame.maxY)
-                <= tolerance
-        )
+            let edgeEffectInteraction = try #require(
+                content.tabItemsView.value(
+                    forKey: "_edgeEffectViewInteraction"
+                ) as? NSObject
+            )
+            let leftPocket = try #require(
+                edgeEffectInteraction.value(
+                    forKey: "leftPocket"
+                ) as? UIView
+            )
+            let leftPageButton = try #require(
+                content.floatingView.floatingTabBar.value(
+                    forKey: "leftArrowButton"
+                ) as? UIView
+            )
+            let leftButton = try #require(
+                leftPageButton.value(forKey: "button") as? UIButton
+            )
+            let leftPocketFrame = leftPocket.convert(
+                leftPocket.bounds,
+                to: content.floatingView.floatingTabBar
+            )
+            let leftButtonFrame = leftButton.convert(
+                leftButton.bounds,
+                to: content.floatingView.floatingTabBar
+            )
+            let leftPocketClass: AnyClass = try #require(
+                object_getClass(leftPocket)
+            )
+            #expect(
+                NSStringFromClass(leftPocketClass)
+                    == "ScrollableTabBarLeftEdgeEffectPocketView"
+            )
+            #expect(leftPocket.mask == nil)
+            #expect(
+                abs(leftPocketFrame.minX - leftButtonFrame.minX)
+                    <= tolerance
+            )
+            #expect(
+                abs(leftPocketFrame.maxX - leftButtonFrame.maxX)
+                    <= tolerance
+            )
+            #expect(
+                abs(leftPocketFrame.minY - leftButtonFrame.minY)
+                    <= tolerance
+            )
+            #expect(
+                abs(leftPocketFrame.maxY - leftButtonFrame.maxY)
+                    <= tolerance
+            )
+        }
     }
 
     @Test
     func expandedWideLayoutFitsTheCurrentFourItemsWithoutPagination() throws {
-        guard #available(iOS 26.0, *) else {
-            return
-        }
-
         let content = try #require(makeContent())
         content.view.frame = CGRect(x: 0, y: 0, width: 640, height: 49)
         let host = UIViewController()

@@ -98,10 +98,9 @@ enum ExpandedPaginationRuntime {
     static func makeFloatingTabBar(
         baseClass: UIView.Type
     ) -> UIView {
-        guard #available(iOS 26.0, *),
-              let expandedClass = makeExpandedFloatingTabBarClass(
-                baseClass: baseClass
-              ) else {
+        guard let expandedClass = makeExpandedFloatingTabBarClass(
+            baseClass: baseClass
+        ) else {
             return baseClass.init(frame: .zero)
         }
 
@@ -117,15 +116,13 @@ enum ExpandedPaginationRuntime {
             )
             return baseClass.init(frame: .zero)
         }
-        guard let glassMetricsBaseClass = NSClassFromString(
-            PrivateUIKitRuntimeNames.floatingTabBarPlatformMetricsGlassBaseClassName
-        ),
-              isVerifiedGlassMetrics(
+        guard let metricsBaseClass = verifiedPlatformMetricsBaseClass(),
+              isVerifiedPlatformMetrics(
                 metrics,
-                baseClass: glassMetricsBaseClass
+                baseClass: metricsBaseClass
               ) else {
             scrollableTabBarLogger.error(
-                "UIKit's floating tab metrics are not the verified Glass implementation; retaining the standard pagination width."
+                "UIKit's floating tab metrics are not a verified platform implementation; retaining the standard pagination width."
             )
             return baseClass.init(frame: .zero)
         }
@@ -136,17 +133,22 @@ enum ExpandedPaginationRuntime {
         _ collectionView: UICollectionView,
         in floatingTabBar: UIView
     ) -> Bool {
-        guard #available(iOS 26.0, *),
-              NSStringFromClass(type(of: floatingTabBar))
+        guard NSStringFromClass(type(of: floatingTabBar))
                 == expandedFloatingTabBarClassName else {
             return true
         }
 
-        guard collectionView.contentInset == .zero,
-              configureEdgeEffects(
-                on: collectionView,
-                in: floatingTabBar
-              ) else {
+        guard collectionView.contentInset == .zero else {
+            scrollableTabBarLogger.error(
+                "UIKit's floating-tab scroll contract changed; using the public adaptive tab control."
+            )
+            return false
+        }
+        if #available(iOS 26.0, *),
+           configureEdgeEffects(
+               on: collectionView,
+               in: floatingTabBar
+           ) == false {
             scrollableTabBarLogger.error(
                 "UIKit's floating-tab scroll contract changed; using the public adaptive tab control."
             )
@@ -191,13 +193,26 @@ enum ExpandedPaginationRuntime {
         return true
     }
 
-    static func isVerifiedGlassMetrics(
+    static func isVerifiedPlatformMetrics(
         _ metrics: AnyObject,
         baseClass: AnyClass
     ) -> Bool {
-        // UIKit specializes the verified Glass metrics base with device-specific
+        // UIKit can specialize a verified metrics base with device-specific
         // subclasses, so exact type equality would reject compatible runtimes.
         (metrics as? NSObject)?.isKind(of: baseClass) == true
+    }
+
+    private static func verifiedPlatformMetricsBaseClass() -> AnyClass? {
+        // iOS 18 uses the legacy material metrics while iOS 26 moves the same
+        // pagination contract onto its Glass metrics hierarchy.
+        let className = if #available(iOS 26.0, *) {
+            PrivateUIKitRuntimeNames
+                .floatingTabBarPlatformMetricsGlassBaseClassName
+        } else {
+            PrivateUIKitRuntimeNames
+                .floatingTabBarPlatformMetricsBaseClassName
+        }
+        return NSClassFromString(className)
     }
 
     static func maximumContainerSize(of floatingTabBar: UIView) -> CGSize? {
@@ -321,10 +336,12 @@ enum ExpandedPaginationRuntime {
                     to: UpdateItemContentAlphaImplementation.self
                 )
                 implementation(object, updateAlphaSelector, indexPath)
-                restoreItemContentAlpha(
-                    at: indexPath as IndexPath,
-                    in: object
-                )
+                if #available(iOS 26.0, *) {
+                    restoreItemContentAlpha(
+                        at: indexPath as IndexPath,
+                        in: object
+                    )
+                }
             }
         let updateAlphaOverride = unsafe imp_implementationWithBlock(
             updateAlphaBlock
@@ -1782,9 +1799,7 @@ enum ExpandedPaginationRuntime {
     }
 
     private static func verifiedBackgroundInsetsMethod() -> Bool {
-        guard let metricsClass = NSClassFromString(
-            PrivateUIKitRuntimeNames.floatingTabBarPlatformMetricsGlassBaseClassName
-        ) else {
+        guard let metricsClass = verifiedPlatformMetricsBaseClass() else {
             return false
         }
         return unsafe verifiedMethod(

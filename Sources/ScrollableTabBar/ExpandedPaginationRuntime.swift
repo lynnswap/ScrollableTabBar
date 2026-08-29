@@ -678,7 +678,9 @@ enum ExpandedPaginationRuntime {
                     || abs(frame.size.width - currentFrame.size.width) > tolerance
                     || abs(frame.size.height - currentFrame.size.height) > tolerance
                 if !hasEffectiveFrameChange,
-                   collectionView.isTracking || collectionView.isDragging,
+                   collectionView.isTracking
+                    || collectionView.isDragging
+                    || collectionView.isDecelerating,
                    let naturalRange = naturalHorizontalScrollRange(
                        in: collectionView,
                        viewportWidth: collectionView.bounds.width
@@ -690,7 +692,8 @@ enum ExpandedPaginationRuntime {
                     // UIScrollView revalidates contentOffset in setFrame: even
                     // when the effective frame is unchanged. During trailing
                     // rubber-banding that turns a no-op layout pass into an
-                    // immediate clamp back to the physical maximum.
+                    // immediate clamp back to the physical maximum, including
+                    // while UIKit is animating the release spring.
                     return
                 }
                 implementation(object, setFrameSelector, frame)

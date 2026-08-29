@@ -667,6 +667,32 @@ enum ExpandedPaginationRuntime {
                 // expanded width at the frame-mutation boundary.
                 var frame = proposedFrame
                 frame.size.width = max(proposedFrame.width, viewportWidth)
+                let currentFrame = collectionView.frame
+                let tolerance = 1 / max(
+                    collectionView.traitCollection.displayScale,
+                    1
+                )
+                let hasEffectiveFrameChange =
+                    abs(frame.origin.x - currentFrame.origin.x) > tolerance
+                    || abs(frame.origin.y - currentFrame.origin.y) > tolerance
+                    || abs(frame.size.width - currentFrame.size.width) > tolerance
+                    || abs(frame.size.height - currentFrame.size.height) > tolerance
+                if !hasEffectiveFrameChange,
+                   collectionView.isTracking || collectionView.isDragging,
+                   let naturalRange = naturalHorizontalScrollRange(
+                       in: collectionView,
+                       viewportWidth: collectionView.bounds.width
+                   ),
+                   collectionView.contentOffset.x
+                    < naturalRange.lowerBound - tolerance
+                    || collectionView.contentOffset.x
+                        > naturalRange.upperBound + tolerance {
+                    // UIScrollView revalidates contentOffset in setFrame: even
+                    // when the effective frame is unchanged. During trailing
+                    // rubber-banding that turns a no-op layout pass into an
+                    // immediate clamp back to the physical maximum.
+                    return
+                }
                 implementation(object, setFrameSelector, frame)
             }
         let setFrameOverride = unsafe imp_implementationWithBlock(

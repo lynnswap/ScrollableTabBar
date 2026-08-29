@@ -1449,6 +1449,36 @@ enum ExpandedPaginationRuntime {
         return unsafe method_getImplementation(method)
     }
 
+    static func semanticPageModelWidth(
+        firstPageOrigin: CGFloat,
+        firstPageWidth: CGFloat,
+        finalPageOrigin: CGFloat,
+        finalPageWidth: CGFloat
+    ) -> CGFloat? {
+        let dimensions = [
+            firstPageOrigin,
+            firstPageWidth,
+            finalPageOrigin,
+            finalPageWidth,
+        ]
+        guard dimensions.allSatisfy(\.isFinite),
+              firstPageWidth >= 0,
+              finalPageWidth >= 0 else {
+            return nil
+        }
+
+        let lowerBound = min(firstPageOrigin, finalPageOrigin)
+        let upperBound = max(
+            firstPageOrigin + firstPageWidth,
+            finalPageOrigin + finalPageWidth
+        )
+        let width = upperBound - lowerBound
+        guard width.isFinite, width >= 0 else {
+            return nil
+        }
+        return width
+    }
+
     private static func semanticContentWidth(
         in collectionView: UICollectionView,
         originalContentOffsetImplementation: IMP,
@@ -1469,33 +1499,46 @@ enum ExpandedPaginationRuntime {
             to: ContentOffsetForPageImplementation.self
         )
         // UICollectionView materializes its content extent lazily. UIKit's
-        // page model already owns the complete final-page geometry.
+        // page model already owns the complete boundary-page geometry.
+        let firstPageIndex = 0
         let finalPageIndex = pages.count - 1
-        let finalPage = pages[finalPageIndex] as AnyObject
-        guard let widthMethod = unsafe verifiedMethod(
-            on: type(of: finalPage),
-            selector: PrivateUIKitRuntimeNames.pageWidthSelector,
-            typeEncoding: expectedPageWidthTypeEncoding
-        ) else {
-            return nil
+        let pageGeometry: (Int) -> (origin: CGFloat, width: CGFloat)? = {
+            pageIndex in
+            let page = pages[pageIndex] as AnyObject
+            guard let widthMethod = unsafe verifiedMethod(
+                on: type(of: page),
+                selector: PrivateUIKitRuntimeNames.pageWidthSelector,
+                typeEncoding: expectedPageWidthTypeEncoding
+            ) else {
+                return nil
+            }
+            let width = unsafe unsafeBitCast(
+                method_getImplementation(widthMethod),
+                to: PageWidthImplementation.self
+            )(
+                page,
+                PrivateUIKitRuntimeNames.pageWidthSelector
+            )
+            let origin = originalContentOffset(
+                collectionView,
+                contentOffsetSelector,
+                pageIndex
+            ).x
+            guard origin.isFinite,
+                  width.isFinite,
+                  width >= 0 else {
+                return nil
+            }
+            return (origin, width)
         }
-        let finalPageWidth = unsafe unsafeBitCast(
-            method_getImplementation(widthMethod),
-            to: PageWidthImplementation.self
-        )(
-            finalPage,
-            PrivateUIKitRuntimeNames.pageWidthSelector
-        )
-        let finalPageOrigin = originalContentOffset(
-            collectionView,
-            contentOffsetSelector,
-            finalPageIndex
-        ).x
-        let semanticWidth = finalPageOrigin + finalPageWidth
-        guard finalPageWidth.isFinite,
-              finalPageWidth >= 0,
-              finalPageOrigin.isFinite,
-              semanticWidth.isFinite else {
+        guard let firstPage = pageGeometry(firstPageIndex),
+              let finalPage = pageGeometry(finalPageIndex),
+              let semanticWidth = semanticPageModelWidth(
+                firstPageOrigin: firstPage.origin,
+                firstPageWidth: firstPage.width,
+                finalPageOrigin: finalPage.origin,
+                finalPageWidth: finalPage.width
+              ) else {
             return nil
         }
         return max(collectionView.contentSize.width, semanticWidth)

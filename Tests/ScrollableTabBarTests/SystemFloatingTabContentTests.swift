@@ -683,6 +683,26 @@ struct SystemFloatingTabContentTests {
     }
 
     @Test
+    func pageModelWidthSupportsBothDirections() {
+        #expect(
+            ExpandedPaginationRuntime.semanticPageModelWidth(
+                firstPageOrigin: 0,
+                firstPageWidth: 180,
+                finalPageOrigin: 420,
+                finalPageWidth: 200
+            ) == 620
+        )
+        #expect(
+            ExpandedPaginationRuntime.semanticPageModelWidth(
+                firstPageOrigin: 440,
+                firstPageWidth: 180,
+                finalPageOrigin: 0,
+                finalPageWidth: 200
+            ) == 620
+        )
+    }
+
+    @Test
     func translatesDelegateSelectionAndDisabledState() throws {
         let content = try #require(makeContent())
         var selectedIndices: [Int] = []

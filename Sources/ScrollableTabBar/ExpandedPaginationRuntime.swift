@@ -35,14 +35,28 @@ enum ExpandedPaginationRuntime {
             )
             return baseClass.init(frame: .zero)
         }
-        guard NSStringFromClass(type(of: metrics))
-            == PrivateUIKitRuntimeNames.floatingTabBarPlatformMetricsGlassClassName else {
+        guard let glassMetricsBaseClass = NSClassFromString(
+            PrivateUIKitRuntimeNames.floatingTabBarPlatformMetricsGlassBaseClassName
+        ),
+              isVerifiedGlassMetrics(
+                metrics,
+                baseClass: glassMetricsBaseClass
+              ) else {
             scrollableTabBarLogger.error(
                 "UIKit's floating tab metrics are not the verified Glass implementation; retaining the standard pagination width."
             )
             return baseClass.init(frame: .zero)
         }
         return expandedTabBar
+    }
+
+    static func isVerifiedGlassMetrics(
+        _ metrics: AnyObject,
+        baseClass: AnyClass
+    ) -> Bool {
+        // UIKit specializes the verified Glass metrics base with device-specific
+        // subclasses, so exact type equality would reject compatible runtimes.
+        (metrics as? NSObject)?.isKind(of: baseClass) == true
     }
 
     static func maximumContainerSize(of floatingTabBar: UIView) -> CGSize? {

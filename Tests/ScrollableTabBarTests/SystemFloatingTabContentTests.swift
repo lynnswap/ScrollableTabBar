@@ -5,6 +5,31 @@ import UIKit
 @MainActor
 @Suite(.serialized)
 struct SystemFloatingTabContentTests {
+    private class GlassMetricsFixture: NSObject {}
+    private final class GlassPhoneMetricsFixture: GlassMetricsFixture {}
+
+    @Test
+    func classifiesVerifiedGlassMetricsByInheritance() {
+        #expect(
+            ExpandedPaginationRuntime.isVerifiedGlassMetrics(
+                GlassMetricsFixture(),
+                baseClass: GlassMetricsFixture.self
+            )
+        )
+        #expect(
+            ExpandedPaginationRuntime.isVerifiedGlassMetrics(
+                GlassPhoneMetricsFixture(),
+                baseClass: GlassMetricsFixture.self
+            )
+        )
+        #expect(
+            ExpandedPaginationRuntime.isVerifiedGlassMetrics(
+                NSObject(),
+                baseClass: GlassMetricsFixture.self
+            ) == false
+        )
+    }
+
     @Test
     func usesUIKitPagingExpandedWidthAndStableTabIdentity() throws {
         let content = try #require(makeContent())

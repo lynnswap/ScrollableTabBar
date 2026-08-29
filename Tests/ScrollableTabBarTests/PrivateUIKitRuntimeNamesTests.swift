@@ -17,7 +17,7 @@ struct PrivateUIKitRuntimeNamesTests {
     func catalogDecodesEveryRuntimeIdentifier() {
         #expect(PrivateUIKitRuntimeNames.floatingTabBarClassName == "_UIFloatingTabBar")
         #expect(
-            PrivateUIKitRuntimeNames.floatingTabBarPlatformMetricsGlassClassName
+            PrivateUIKitRuntimeNames.floatingTabBarPlatformMetricsGlassBaseClassName
                 == "_UIFloatingTabBarPlatformMetrics_Glass"
         )
         #expect(PrivateUIKitRuntimeNames.liquidLensViewClassName == "_UILiquidLensView")

@@ -88,6 +88,60 @@ struct SystemFloatingTabContentTests {
             } == 2
         )
 
+        if #available(iOS 26.0, *) {
+            let leftArrowButton = try #require(
+                content.floatingView.floatingTabBar.value(
+                    forKey: "leftArrowButton"
+                ) as? UIView
+            )
+            let rightArrowButton = try #require(
+                content.floatingView.floatingTabBar.value(
+                    forKey: "rightArrowButton"
+                ) as? UIView
+            )
+            #expect(
+                content.tabItemsView.leftEdgeEffect.style.isEqual(
+                    UIScrollEdgeEffect.Style.soft
+                )
+            )
+            #expect(
+                content.tabItemsView.rightEdgeEffect.style.isEqual(
+                    UIScrollEdgeEffect.Style.soft
+                )
+            )
+            #expect(
+                content.tabItemsView.leftEdgeEffect.value(
+                    forKey: "_overrideGeometryView"
+                ) as? UIView === leftArrowButton
+            )
+            #expect(
+                content.tabItemsView.rightEdgeEffect.value(
+                    forKey: "_overrideGeometryView"
+                ) as? UIView === rightArrowButton
+            )
+            #expect(content.tabItemsView.leftEdgeEffect.isHidden)
+            #expect(content.tabItemsView.rightEdgeEffect.isHidden == false)
+            if #available(iOS 27.0, *) {
+                let edgeEffectInteraction = try #require(
+                    content.tabItemsView.value(
+                        forKey: "_edgeEffectViewInteraction"
+                    ) as? NSObject
+                )
+                let rightPocket = try #require(
+                    edgeEffectInteraction.value(
+                        forKey: "rightPocket"
+                    ) as? UIView
+                )
+                #expect(rightPocket.bounds.width > 0)
+                #expect(rightPocket.bounds.height > 0)
+            }
+            #expect(
+                content.tabItemsView.visibleCells.allSatisfy {
+                    $0.contentView.alpha == 1
+                }
+            )
+        }
+
         content.render(
             selectedIndex: 3,
             isEnabled: true,
@@ -188,11 +242,16 @@ struct SystemFloatingTabContentTests {
         }
 
         content.tabItemsView.setContentOffset(
-            CGPoint(x: 100, y: 0),
+            CGPoint(x: 47.25, y: 0),
             animated: false
         )
         content.floatingView.floatingTabBar.setNeedsLayout()
         content.floatingView.floatingTabBar.layoutIfNeeded()
+        #expect(
+            content.tabItemsView.visibleCells.allSatisfy {
+                $0.contentView.alpha == 1
+            }
+        )
         let fractionalContentView = try #require(
             content.floatingView.floatingTabBar.value(
                 forKey: "contentView"
@@ -224,12 +283,24 @@ struct SystemFloatingTabContentTests {
     }
 
     @Test
-    func nativePageTargetsRemainReachableAfterViewportExpansion() throws {
+    func pageTargetsUsePhysicalScrollRangeAndAlignLastItem() throws {
         guard #available(iOS 26.0, *) else {
             return
         }
 
-        let content = try #require(makeContent())
+        let content = try #require(
+            makeContent(
+                titles: [
+                    "Overview",
+                    "Headers",
+                    "Preview",
+                    "Cookies",
+                    "Security",
+                    "Timing",
+                    "Response",
+                ]
+            )
+        )
         content.view.frame = CGRect(x: 0, y: 0, width: 314, height: 49)
         let host = UIViewController()
         host.view.addSubview(content.view)
@@ -249,8 +320,8 @@ struct SystemFloatingTabContentTests {
         let pages = try #require(
             content.tabItemsView.value(forKey: "pages") as? NSArray
         )
-        #expect(pages.count > 1)
-        #expect(content.tabItemsView.contentInset.right > 0)
+        #expect(pages.count > 2)
+        #expect(content.tabItemsView.contentInset.right == 0)
 
         let incrementSelector = NSSelectorFromString(
             "incrementTargetPage"
@@ -295,14 +366,21 @@ struct SystemFloatingTabContentTests {
                     - CGFloat(pages.count - 1)
             ) <= tolerance
         )
+        let systemRightInset =
+            content.tabItemsView.adjustedContentInset.right
+            - content.tabItemsView.contentInset.right
         let maximumOffset =
             content.tabItemsView.contentSize.width
             - content.tabItemsView.bounds.width
-            + content.tabItemsView.adjustedContentInset.right
+            + systemRightInset
         #expect(
-            content.tabItemsView.contentOffset.x
-                <= maximumOffset + tolerance
+            abs(
+                content.tabItemsView.contentOffset.x
+                    - maximumOffset
+            ) <= tolerance
         )
+        #expect(content.tabItemsView.contentInset.right == 0)
+        #expect(content.tabItemsView.rightEdgeEffect.isHidden)
     }
 
     @Test
@@ -390,30 +468,23 @@ struct SystemFloatingTabContentTests {
         #expect(tabController.tabs.isEmpty)
     }
 
-    private func makeContent() -> SystemFloatingTabContent? {
+    private func makeContent(
+        titles: [String] = [
+            "Headers",
+            "Preview",
+            "Cookie",
+            "Security",
+        ]
+    ) -> SystemFloatingTabContent? {
         SystemFloatingTabContent.makeIfAvailable(
-            items: [
+            items: titles.enumerated().map { index, title in
                 .init(
-                    title: "Headers",
+                    title: title,
                     image: nil,
-                    accessibilityIdentifier: "ScrollableTabBar.Test.0"
-                ),
-                .init(
-                    title: "Preview",
-                    image: nil,
-                    accessibilityIdentifier: "ScrollableTabBar.Test.1"
-                ),
-                .init(
-                    title: "Cookie",
-                    image: nil,
-                    accessibilityIdentifier: "ScrollableTabBar.Test.2"
-                ),
-                .init(
-                    title: "Security",
-                    image: nil,
-                    accessibilityIdentifier: "ScrollableTabBar.Test.3"
-                ),
-            ],
+                    accessibilityIdentifier:
+                        "ScrollableTabBar.Test.\(index)"
+                )
+            },
             selectedIndex: 0
         )
     }

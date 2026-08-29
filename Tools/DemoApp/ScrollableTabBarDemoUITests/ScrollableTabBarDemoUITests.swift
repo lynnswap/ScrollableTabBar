@@ -30,6 +30,58 @@ final class ScrollableTabBarDemoUITests: XCTestCase {
     }
 
     @MainActor
+    func testSelectsPartiallyVisibleTabAfterContinuousDrag() {
+        let app = XCUIApplication()
+        app.launch()
+
+        let previewTab = app.buttons[
+            "ScrollableTabBarDemo.Tab.preview"
+        ].firstMatch
+        XCTAssertTrue(previewTab.waitForExistence(timeout: 5))
+
+        let startPoint = app.coordinate(
+            withNormalizedOffset: .zero
+        ).withOffset(
+            CGVector(
+                dx: previewTab.frame.midX,
+                dy: previewTab.frame.midY
+            )
+        )
+        let endPoint = startPoint.withOffset(
+            CGVector(dx: -60, dy: 0)
+        )
+        startPoint.press(
+            forDuration: 0.05,
+            thenDragTo: endPoint
+        )
+
+        let partiallyVisiblePoint = app.coordinate(
+            withNormalizedOffset: .zero
+        ).withOffset(
+            CGVector(
+                dx: previewTab.frame.maxX + 5,
+                dy: previewTab.frame.midY
+            )
+        )
+        partiallyVisiblePoint.tap()
+
+        let selectionLabel = app.staticTexts[
+            "ScrollableTabBarDemo.SelectionLabel"
+        ]
+        let selectedCookies = XCTNSPredicateExpectation(
+            predicate: NSPredicate(
+                format: "label == %@",
+                "Selected: Cookies"
+            ),
+            object: selectionLabel
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [selectedCookies], timeout: 5),
+            .completed
+        )
+    }
+
+    @MainActor
     func testSelectsOverflowItemAcrossAvailablePresentation() throws {
         let app = XCUIApplication()
         app.launch()

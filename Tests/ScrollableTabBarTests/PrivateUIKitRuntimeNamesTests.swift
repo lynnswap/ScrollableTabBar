@@ -122,5 +122,45 @@ struct PrivateUIKitRuntimeNamesTests {
             NSStringFromSelector(PrivateUIKitRuntimeNames.sidebarVisibilitySelector)
                 == PrivateUIKitRuntimeNames.sidebarVisibilityKey
         )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.updateItemContentAlphaSelector
+            ) == "_updateContentAlphaForItemAtIndexPath:"
+        )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.gestureIndexPathSelector
+            ) == "_indexPathForGestureRecognizer:"
+        )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.contentOffsetForPageSelector
+            ) == "contentOffsetForPage:"
+        )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.pageProgressForContentOffsetSelector
+            ) == "pageProgressForContentOffset:clamped:"
+        )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.edgeEffectGeometryViewWriteSelector
+            ) == "_setOverrideGeometryView:"
+        )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.edgeEffectViewInteractionSelector
+            ) == "_edgeEffectViewInteraction"
+        )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.edgeEffectUpdateSelector
+            ) == "update"
+        )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.pageButtonContentOpacitySelector
+            ) == "contentOpacity"
+        )
     }
 }

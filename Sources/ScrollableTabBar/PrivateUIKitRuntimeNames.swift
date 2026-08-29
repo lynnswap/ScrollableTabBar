@@ -67,6 +67,12 @@ enum PrivateUIKitRuntimeNames {
     static let currentPageSelector = NSSelectorFromString(
         currentPageSelectorName
     )
+    // Original: width
+    static let pageWidthSelector = NSSelectorFromString(
+        decodedString([
+            0xD0, 0xCE, 0xC3, 0xD3, 0xCF,
+        ])
+    )
     // Original: leftArrowButton
     static let leftArrowButtonSelectorName = decodedString([
         0xCB, 0xC2, 0xC1, 0xD3, 0xE6, 0xD5, 0xD5, 0xC8,

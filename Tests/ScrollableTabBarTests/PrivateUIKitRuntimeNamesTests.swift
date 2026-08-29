@@ -88,6 +88,11 @@ struct PrivateUIKitRuntimeNamesTests {
         )
         #expect(
             NSStringFromSelector(
+                PrivateUIKitRuntimeNames.pageWidthSelector
+            ) == "width"
+        )
+        #expect(
+            NSStringFromSelector(
                 PrivateUIKitRuntimeNames.leftArrowButtonSelector
             ) == PrivateUIKitRuntimeNames.leftArrowButtonSelectorName
         )

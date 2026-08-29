@@ -27,6 +27,14 @@ enum ExpandedPaginationRuntime {
             Selector,
             UIGestureRecognizer
         ) -> NSIndexPath?
+    private typealias ScrollViewWillEndDraggingImplementation =
+        @convention(c) (
+            AnyObject,
+            Selector,
+            UIScrollView,
+            CGPoint,
+            UnsafeMutablePointer<CGPoint>
+        ) -> Void
     private typealias ContentOffsetForPageImplementation =
         @convention(c) (AnyObject, Selector, Int) -> CGPoint
     private typealias PageProgressForContentOffsetImplementation =
@@ -39,6 +47,8 @@ enum ExpandedPaginationRuntime {
     private typealias EdgeEffectGeometryViewSetter =
         @convention(c) (AnyObject, Selector, UIView?) -> Void
     private typealias PageButtonContentOpacityImplementation =
+        @convention(c) (AnyObject, Selector) -> CGFloat
+    private typealias PageWidthImplementation =
         @convention(c) (AnyObject, Selector) -> CGFloat
 
     private static let expandedFloatingTabBarClassName =
@@ -62,6 +72,8 @@ enum ExpandedPaginationRuntime {
         "v24@0:8@16"
     private static let expectedGestureIndexPathTypeEncoding =
         "@24@0:8@16"
+    private static let expectedScrollViewWillEndDraggingTypeEncoding =
+        "v48@0:8@16{CGPoint=dd}24N^{CGPoint=dd}40"
     private static let expectedContentOffsetForPageTypeEncoding =
         "{CGPoint=dd}24@0:8q16"
     private static let expectedPageProgressForContentOffsetTypeEncoding =
@@ -74,6 +86,7 @@ enum ExpandedPaginationRuntime {
     private static let expectedVoidMethodTypeEncoding = "v16@0:8"
     private static let expectedPageButtonContentOpacityTypeEncoding =
         "d16@0:8"
+    private static let expectedPageWidthTypeEncoding = "d16@0:8"
     // Match UIView's effective visibility boundary so the blur and hit region
     // disappear with the native arrow rather than its floating-point tail.
     private static let minimumVisiblePageButtonOpacity: CGFloat = 0.01
@@ -217,6 +230,11 @@ enum ExpandedPaginationRuntime {
             PrivateUIKitRuntimeNames.updateItemContentAlphaSelector
         let gestureIndexPathSelector =
             PrivateUIKitRuntimeNames.gestureIndexPathSelector
+        let scrollViewWillEndDraggingSelector = #selector(
+            UIScrollViewDelegate.scrollViewWillEndDragging(
+                _:withVelocity:targetContentOffset:
+            )
+        )
         guard let maximumSizeMethod = unsafe verifiedMethod(
             on: baseClass,
             selector: maximumSizeSelector,
@@ -236,6 +254,12 @@ enum ExpandedPaginationRuntime {
                 on: baseClass,
                 selector: gestureIndexPathSelector,
                 typeEncoding: expectedGestureIndexPathTypeEncoding
+              ),
+              let scrollViewWillEndDraggingMethod = unsafe verifiedMethod(
+                on: baseClass,
+                selector: scrollViewWillEndDraggingSelector,
+                typeEncoding:
+                    expectedScrollViewWillEndDraggingTypeEncoding
               ) else {
             scrollableTabBarLogger.error(
                 "UIKit's floating-tab interaction contract changed; retaining the standard presentation."
@@ -340,6 +364,42 @@ enum ExpandedPaginationRuntime {
             gestureIndexPathBlock
         )
 
+        let originalScrollViewWillEndDraggingImplementation =
+            unsafe method_getImplementation(
+                scrollViewWillEndDraggingMethod
+            )
+        let scrollViewWillEndDraggingBlock:
+            @convention(block) (
+                AnyObject,
+                UIScrollView,
+                CGPoint,
+                UnsafeMutablePointer<CGPoint>
+            ) -> Void = {
+                object,
+                scrollView,
+                velocity,
+                targetContentOffset in
+                let implementation = unsafe unsafeBitCast(
+                    originalScrollViewWillEndDraggingImplementation,
+                    to: ScrollViewWillEndDraggingImplementation.self
+                )
+                implementation(
+                    object,
+                    scrollViewWillEndDraggingSelector,
+                    scrollView,
+                    velocity,
+                    targetContentOffset
+                )
+                alignDecelerationTarget(
+                    targetContentOffset,
+                    for: scrollView,
+                    in: object
+                )
+            }
+        let scrollViewWillEndDraggingOverride = unsafe imp_implementationWithBlock(
+            scrollViewWillEndDraggingBlock
+        )
+
         guard let subclass = unsafe objc_allocateClassPair(
             baseClass,
             expandedFloatingTabBarClassName,
@@ -349,6 +409,7 @@ enum ExpandedPaginationRuntime {
             unsafe imp_removeBlock(layoutOverride)
             unsafe imp_removeBlock(updateAlphaOverride)
             unsafe imp_removeBlock(gestureIndexPathOverride)
+            unsafe imp_removeBlock(scrollViewWillEndDraggingOverride)
             scrollableTabBarLogger.error(
                 "UIKit's floating-tab pagination subclass could not be allocated."
             )
@@ -377,11 +438,18 @@ enum ExpandedPaginationRuntime {
                 gestureIndexPathSelector,
                 gestureIndexPathOverride,
                 method_getTypeEncoding(gestureIndexPathMethod)
+              ),
+              unsafe class_addMethod(
+                subclass,
+                scrollViewWillEndDraggingSelector,
+                scrollViewWillEndDraggingOverride,
+                method_getTypeEncoding(scrollViewWillEndDraggingMethod)
               ) else {
             unsafe imp_removeBlock(maximumSizeOverride)
             unsafe imp_removeBlock(layoutOverride)
             unsafe imp_removeBlock(updateAlphaOverride)
             unsafe imp_removeBlock(gestureIndexPathOverride)
+            unsafe imp_removeBlock(scrollViewWillEndDraggingOverride)
             objc_disposeClassPair(subclass)
             scrollableTabBarLogger.error(
                 "UIKit's floating-tab overrides could not be installed."
@@ -490,7 +558,10 @@ enum ExpandedPaginationRuntime {
                 return clampedContentOffset(
                     originalOffset,
                     forPage: page,
-                    in: collectionView
+                    in: collectionView,
+                    originalContentOffsetImplementation:
+                        originalContentOffsetImplementation,
+                    contentOffsetSelector: contentOffsetSelector
                 )
             }
         let contentOffsetOverride = unsafe imp_implementationWithBlock(
@@ -1273,18 +1344,133 @@ enum ExpandedPaginationRuntime {
             .takeUnretainedValue() as? UICollectionView
     }
 
+    private static func originalContentOffsetImplementation(
+        for collectionView: UICollectionView
+    ) -> IMP? {
+        guard let runtimeClass = object_getClass(collectionView),
+              let baseClass = class_getSuperclass(runtimeClass),
+              let method = unsafe verifiedMethod(
+                on: baseClass,
+                selector:
+                    PrivateUIKitRuntimeNames.contentOffsetForPageSelector,
+                typeEncoding: expectedContentOffsetForPageTypeEncoding
+              ) else {
+            return nil
+        }
+        return unsafe method_getImplementation(method)
+    }
+
+    private static func semanticContentWidth(
+        in collectionView: UICollectionView,
+        originalContentOffsetImplementation: IMP,
+        contentOffsetSelector: Selector
+    ) -> CGFloat? {
+        guard collectionView.responds(
+            to: PrivateUIKitRuntimeNames.pagesSelector
+        ),
+              let pages = unsafe collectionView
+                .perform(PrivateUIKitRuntimeNames.pagesSelector)?
+                .takeUnretainedValue() as? NSArray,
+              pages.count > 0 else {
+            return nil
+        }
+
+        let originalContentOffset = unsafe unsafeBitCast(
+            originalContentOffsetImplementation,
+            to: ContentOffsetForPageImplementation.self
+        )
+        // UICollectionView materializes its content extent lazily. UIKit's
+        // page model already owns the complete final-page geometry.
+        let finalPageIndex = pages.count - 1
+        let finalPage = pages[finalPageIndex] as AnyObject
+        guard let widthMethod = unsafe verifiedMethod(
+            on: type(of: finalPage),
+            selector: PrivateUIKitRuntimeNames.pageWidthSelector,
+            typeEncoding: expectedPageWidthTypeEncoding
+        ) else {
+            return nil
+        }
+        let finalPageWidth = unsafe unsafeBitCast(
+            method_getImplementation(widthMethod),
+            to: PageWidthImplementation.self
+        )(
+            finalPage,
+            PrivateUIKitRuntimeNames.pageWidthSelector
+        )
+        let finalPageOrigin = originalContentOffset(
+            collectionView,
+            contentOffsetSelector,
+            finalPageIndex
+        ).x
+        let semanticWidth = finalPageOrigin + finalPageWidth
+        guard finalPageWidth.isFinite,
+              finalPageWidth >= 0,
+              finalPageOrigin.isFinite,
+              semanticWidth.isFinite else {
+            return nil
+        }
+        return max(collectionView.contentSize.width, semanticWidth)
+    }
+
+    private static func alignDecelerationTarget(
+        _ targetContentOffset: UnsafeMutablePointer<CGPoint>,
+        for scrollView: UIScrollView,
+        in object: AnyObject
+    ) {
+        guard let floatingTabBar = object as? UIView,
+              let collectionView = collectionView(in: floatingTabBar),
+              collectionView === scrollView,
+              collectionView.responds(
+                to: PrivateUIKitRuntimeNames.pagesSelector
+              ),
+              let pages = unsafe collectionView
+                .perform(PrivateUIKitRuntimeNames.pagesSelector)?
+                .takeUnretainedValue() as? NSArray,
+              pages.count > 0,
+              let originalContentOffsetImplementation =
+                originalContentOffsetImplementation(
+                    for: collectionView
+                ) else {
+            return
+        }
+
+        // Paging is disabled for continuous dragging, so UIKit leaves the
+        // predicted endpoint based on the viewport that is visible at release.
+        // Clamp only predictions beyond the semantic first or final edge now;
+        // otherwise releasing the trailing arrow reservation causes a second
+        // correction in a later layout pass.
+        targetContentOffset.pointee = clampedContentOffset(
+            targetContentOffset.pointee,
+            forPage: pages.count - 1,
+            in: collectionView,
+            originalContentOffsetImplementation:
+                originalContentOffsetImplementation,
+            contentOffsetSelector:
+                PrivateUIKitRuntimeNames.contentOffsetForPageSelector
+        )
+    }
+
     private static func clampedContentOffset(
         _ contentOffset: CGPoint,
         forPage page: Int,
-        in collectionView: UICollectionView
+        in collectionView: UICollectionView,
+        originalContentOffsetImplementation: IMP,
+        contentOffsetSelector: Selector
     ) -> CGPoint {
         let viewportWidth = pageViewportWidth(
             for: collectionView,
             pageProgress: CGFloat(page)
         ) ?? collectionView.bounds.width
+        let contentWidth = semanticContentWidth(
+            in: collectionView,
+            originalContentOffsetImplementation:
+                originalContentOffsetImplementation,
+            contentOffsetSelector: contentOffsetSelector
+        ) ?? collectionView.contentSize.width
         guard let range = naturalHorizontalScrollRange(
             in: collectionView,
-            viewportWidth: viewportWidth
+            viewportWidth: viewportWidth,
+            contentWidth: contentWidth
         ) else {
             return contentOffset
         }
@@ -1324,7 +1510,10 @@ enum ExpandedPaginationRuntime {
             return clampedContentOffset(
                 originalTarget,
                 forPage: page,
-                in: collectionView
+                in: collectionView,
+                originalContentOffsetImplementation:
+                    originalContentOffsetImplementation,
+                contentOffsetSelector: contentOffsetSelector
             ).x
         }
         guard targets.count > 1 else {
@@ -1384,7 +1573,8 @@ enum ExpandedPaginationRuntime {
 
     private static func naturalHorizontalScrollRange(
         in collectionView: UICollectionView,
-        viewportWidth: CGFloat
+        viewportWidth: CGFloat,
+        contentWidth: CGFloat? = nil
     ) -> ClosedRange<CGFloat>? {
         let systemLeftInset =
             collectionView.adjustedContentInset.left
@@ -1392,8 +1582,10 @@ enum ExpandedPaginationRuntime {
         let systemRightInset =
             collectionView.adjustedContentInset.right
             - collectionView.contentInset.right
+        let resolvedContentWidth =
+            contentWidth ?? collectionView.contentSize.width
         let dimensions = [
-            collectionView.contentSize.width,
+            resolvedContentWidth,
             viewportWidth,
             systemLeftInset,
             systemRightInset,
@@ -1406,7 +1598,7 @@ enum ExpandedPaginationRuntime {
 
         let minimumOffset = -systemLeftInset
         let maximumOffset = max(
-            collectionView.contentSize.width
+            resolvedContentWidth
                 - viewportWidth
                 + systemRightInset,
             minimumOffset

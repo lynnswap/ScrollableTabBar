@@ -356,6 +356,100 @@ struct SystemFloatingTabContentTests {
     }
 
     @Test
+    func trailingDecelerationTargetsTheFinalPhysicalEdge() throws {
+        guard #available(iOS 26.0, *) else {
+            return
+        }
+
+        let content = try #require(
+            makeContent(
+                titles: [
+                    "Overview",
+                    "Headers",
+                    "Preview",
+                    "Cookies",
+                    "Security",
+                    "Timing",
+                    "Response",
+                ]
+            )
+        )
+        content.view.frame = CGRect(x: 0, y: 0, width: 314, height: 49)
+        let host = UIViewController()
+        host.view.addSubview(content.view)
+        let window = showInWindow(host)
+        defer { window.isHidden = true }
+
+        content.render(
+            selectedIndex: 0,
+            isEnabled: true,
+            accessibilityLabel: "Detail Mode",
+            accessibilityIdentifier: "ScrollableTabBar.Control"
+        )
+        window.layoutIfNeeded()
+        content.view.layoutIfNeeded()
+        content.floatingView.floatingTabBar.layoutIfNeeded()
+
+        let pages = try #require(
+            content.tabItemsView.value(forKey: "pages") as? NSArray
+        )
+        let finalPage = pages.count - 1
+        let targetPageSelector = NSSelectorFromString("targetPage")
+        let contentOffsetSelector = NSSelectorFromString(
+            "contentOffsetForPage:"
+        )
+        typealias TargetPageImplementation =
+            @convention(c) (AnyObject, Selector) -> Int
+        typealias ContentOffsetImplementation =
+            @convention(c) (AnyObject, Selector, Int) -> CGPoint
+
+        let targetPage = unsafe unsafeBitCast(
+            content.tabItemsView.method(for: targetPageSelector),
+            to: TargetPageImplementation.self
+        )
+        let contentOffset = unsafe unsafeBitCast(
+            content.tabItemsView.method(for: contentOffsetSelector),
+            to: ContentOffsetImplementation.self
+        )
+
+        let pageTargets = (0..<pages.count).map { page in
+            contentOffset(
+                content.tabItemsView,
+                contentOffsetSelector,
+                page
+            ).x
+        }
+        #expect(
+            zip(pageTargets, pageTargets.dropFirst()).allSatisfy {
+                $0.0 < $0.1
+            }
+        )
+
+        var proposedOffset = CGPoint(
+            x: pageTargets[finalPage] + 100,
+            y: 0
+        )
+        unsafe content.tabItemsView.delegate?.scrollViewWillEndDragging?(
+            content.tabItemsView,
+            withVelocity: CGPoint(x: 2, y: 0),
+            targetContentOffset: &proposedOffset
+        )
+
+        let finalMaximumOffset = pageTargets[finalPage]
+        let tolerance = 1 / max(
+            content.floatingView.traitCollection.displayScale,
+            1
+        )
+        #expect(
+            targetPage(content.tabItemsView, targetPageSelector)
+                == finalPage
+        )
+        #expect(
+            abs(proposedOffset.x - finalMaximumOffset) <= tolerance
+        )
+    }
+
+    @Test
     func pageTargetsUsePhysicalScrollRangeAndAlignLastItem() throws {
         guard #available(iOS 26.0, *) else {
             return

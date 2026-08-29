@@ -356,6 +356,74 @@ struct SystemFloatingTabContentTests {
     }
 
     @Test
+    func expandedCollectionOwnsViewportFrameMutation() throws {
+        guard #available(iOS 26.0, *) else {
+            return
+        }
+
+        let content = try #require(
+            makeContent(
+                titles: [
+                    "Overview",
+                    "Headers",
+                    "Preview",
+                    "Cookies",
+                    "Security",
+                    "Timing",
+                    "Response",
+                ]
+            )
+        )
+        content.view.frame = CGRect(x: 0, y: 0, width: 314, height: 49)
+        let host = UIViewController()
+        host.view.addSubview(content.view)
+        let window = showInWindow(host)
+        defer { window.isHidden = true }
+
+        content.render(
+            selectedIndex: 0,
+            isEnabled: true,
+            accessibilityLabel: "Detail Mode",
+            accessibilityIdentifier: "ScrollableTabBar.Control"
+        )
+        window.layoutIfNeeded()
+        content.view.layoutIfNeeded()
+        content.floatingView.floatingTabBar.layoutIfNeeded()
+
+        let tolerance = 1 / max(
+            content.floatingView.traitCollection.displayScale,
+            1
+        )
+        let expandedFrame = content.tabItemsView.frame
+
+        var nativeProposedFrame = expandedFrame
+        nativeProposedFrame.origin.x += 3
+        nativeProposedFrame.size.width -= 60
+        content.tabItemsView.frame = nativeProposedFrame
+
+        #expect(
+            abs(content.tabItemsView.frame.minX - nativeProposedFrame.minX)
+                <= tolerance
+        )
+        #expect(
+            abs(content.tabItemsView.frame.height - nativeProposedFrame.height)
+                <= tolerance
+        )
+        #expect(
+            content.tabItemsView.frame.width
+                >= expandedFrame.width - tolerance
+        )
+
+        var stretchedFrame = nativeProposedFrame
+        stretchedFrame.size.width = expandedFrame.width + 18
+        content.tabItemsView.frame = stretchedFrame
+        #expect(
+            abs(content.tabItemsView.frame.width - stretchedFrame.width)
+                <= tolerance
+        )
+    }
+
+    @Test
     func trailingDecelerationTargetsTheFinalPhysicalEdge() throws {
         guard #available(iOS 26.0, *) else {
             return

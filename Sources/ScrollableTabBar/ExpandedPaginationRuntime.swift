@@ -9,6 +9,8 @@ enum ExpandedPaginationRuntime {
         @convention(c) (AnyObject, Selector) -> Void
     private typealias SetFrameImplementation =
         @convention(c) (AnyObject, Selector, CGRect) -> Void
+    private typealias SetContentInsetImplementation =
+        @convention(c) (AnyObject, Selector, UIEdgeInsets) -> Void
     private typealias ObjectGetterImplementation =
         @convention(c) (AnyObject, Selector) -> AnyObject?
     private typealias ForceEdgeEffectPocketImplementation =
@@ -64,6 +66,8 @@ enum ExpandedPaginationRuntime {
     private static let expectedLayoutSubviewsTypeEncoding = "v16@0:8"
     private static let expectedSetFrameTypeEncoding =
         "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16"
+    private static let expectedSetContentInsetTypeEncoding =
+        "v48@0:8{UIEdgeInsets=dddd}16"
     private static let expectedPageViewportWidthTypeEncoding = "d24@0:8d16"
     private static let expectedCurrentPageTypeEncoding = "d16@0:8"
     private static let expectedBackgroundInsetsTypeEncoding =
@@ -300,7 +304,6 @@ enum ExpandedPaginationRuntime {
                 to: LayoutSubviewsImplementation.self
             )
             implementation(object, layoutSelector)
-            synchronizeCollectionGeometry(in: object)
             synchronizeEdgeEffectVisibility(in: object)
             updateEdgeEffects(in: object)
             synchronizeEdgeEffectPocketGeometry(in: object)
@@ -481,6 +484,10 @@ enum ExpandedPaginationRuntime {
             PrivateUIKitRuntimeNames.contentOffsetForPageSelector
         let pageProgressSelector =
             PrivateUIKitRuntimeNames.pageProgressForContentOffsetSelector
+        let setFrameSelector = #selector(setter: UIView.frame)
+        let setContentInsetSelector = #selector(
+            setter: UIScrollView.contentInset
+        )
         guard let viewportWidthMethod = unsafe verifiedMethod(
             on: baseClass,
             selector: viewportWidthSelector,
@@ -495,6 +502,16 @@ enum ExpandedPaginationRuntime {
                 on: baseClass,
                 selector: pageProgressSelector,
                 typeEncoding: expectedPageProgressForContentOffsetTypeEncoding
+              ),
+              let setFrameMethod = unsafe verifiedMethod(
+                on: baseClass,
+                selector: setFrameSelector,
+                typeEncoding: expectedSetFrameTypeEncoding
+              ),
+              let setContentInsetMethod = unsafe verifiedMethod(
+                on: baseClass,
+                selector: setContentInsetSelector,
+                typeEncoding: expectedSetContentInsetTypeEncoding
               ),
               unsafe verifiedMethod(
                 on: baseClass,
@@ -605,6 +622,83 @@ enum ExpandedPaginationRuntime {
             pageProgressBlock
         )
 
+        let originalSetFrameImplementation = unsafe method_getImplementation(
+            setFrameMethod
+        )
+        let setFrameBlock:
+            @convention(block) (AnyObject, CGRect) -> Void = {
+                object,
+                proposedFrame in
+                let implementation = unsafe unsafeBitCast(
+                    originalSetFrameImplementation,
+                    to: SetFrameImplementation.self
+                )
+                guard let collectionView = object as? UICollectionView,
+                      collectionView.responds(
+                        to: PrivateUIKitRuntimeNames.currentPageSelector
+                      ) else {
+                    implementation(object, setFrameSelector, proposedFrame)
+                    return
+                }
+
+                let currentPage = unsafe unsafeBitCast(
+                    collectionView.method(
+                        for: PrivateUIKitRuntimeNames.currentPageSelector
+                    ),
+                    to: CurrentPageImplementation.self
+                )(
+                    collectionView,
+                    PrivateUIKitRuntimeNames.currentPageSelector
+                )
+                guard currentPage.isFinite,
+                      let viewportWidth = pageViewportWidth(
+                        for: collectionView,
+                        pageProgress: currentPage
+                      ) else {
+                    implementation(object, setFrameSelector, proposedFrame)
+                    return
+                }
+
+                // _UIFloatingTabBar proposes its paginated viewport during
+                // layout. Applying that transient width makes UIScrollView
+                // clamp an active rubber-band offset before a later layout
+                // pass can expand the viewport again. Preserve UIKit's origin,
+                // height, and any wider native stretch while owning the minimum
+                // expanded width at the frame-mutation boundary.
+                var frame = proposedFrame
+                frame.size.width = max(proposedFrame.width, viewportWidth)
+                implementation(object, setFrameSelector, frame)
+            }
+        let setFrameOverride = unsafe imp_implementationWithBlock(
+            setFrameBlock
+        )
+
+        let originalSetContentInsetImplementation =
+            unsafe method_getImplementation(setContentInsetMethod)
+        let setContentInsetBlock:
+            @convention(block) (AnyObject, UIEdgeInsets) -> Void = {
+                object,
+                proposedContentInset in
+                let implementation = unsafe unsafeBitCast(
+                    originalSetContentInsetImplementation,
+                    to: SetContentInsetImplementation.self
+                )
+                // The native paginated layout adds trailing inset for its
+                // narrower viewport. Our page mapping already uses the physical
+                // content extent, so allowing that transient inset creates a
+                // second scroll range and visible empty space.
+                var contentInset = proposedContentInset
+                contentInset.right = 0
+                implementation(
+                    object,
+                    setContentInsetSelector,
+                    contentInset
+                )
+            }
+        let setContentInsetOverride = unsafe imp_implementationWithBlock(
+            setContentInsetBlock
+        )
+
         guard let subclass = unsafe objc_allocateClassPair(
             baseClass,
             expandedCollectionViewClassName,
@@ -613,6 +707,8 @@ enum ExpandedPaginationRuntime {
             unsafe imp_removeBlock(viewportWidthOverride)
             unsafe imp_removeBlock(contentOffsetOverride)
             unsafe imp_removeBlock(pageProgressOverride)
+            unsafe imp_removeBlock(setFrameOverride)
+            unsafe imp_removeBlock(setContentInsetOverride)
             return nil
         }
         guard unsafe class_addMethod(
@@ -632,82 +728,29 @@ enum ExpandedPaginationRuntime {
                 pageProgressSelector,
                 pageProgressOverride,
                 method_getTypeEncoding(pageProgressMethod)
+              ),
+              unsafe class_addMethod(
+                subclass,
+                setFrameSelector,
+                setFrameOverride,
+                method_getTypeEncoding(setFrameMethod)
+              ),
+              unsafe class_addMethod(
+                subclass,
+                setContentInsetSelector,
+                setContentInsetOverride,
+                method_getTypeEncoding(setContentInsetMethod)
               ) else {
             unsafe imp_removeBlock(viewportWidthOverride)
             unsafe imp_removeBlock(contentOffsetOverride)
             unsafe imp_removeBlock(pageProgressOverride)
+            unsafe imp_removeBlock(setFrameOverride)
+            unsafe imp_removeBlock(setContentInsetOverride)
             objc_disposeClassPair(subclass)
             return nil
         }
         objc_registerClassPair(subclass)
         return subclass
-    }
-
-    private static func synchronizeCollectionGeometry(
-        in object: AnyObject
-    ) {
-        guard let floatingTabBar = object as? UIView,
-              let collectionView = collectionView(in: floatingTabBar),
-              NSStringFromClass(type(of: collectionView))
-                == expandedCollectionViewClassName,
-              collectionView.responds(
-                to: PrivateUIKitRuntimeNames.currentPageSelector
-              ) else {
-            return
-        }
-
-        let currentPage = unsafe unsafeBitCast(
-            collectionView.method(
-                for: PrivateUIKitRuntimeNames.currentPageSelector
-            ),
-            to: CurrentPageImplementation.self
-        )(
-            collectionView,
-            PrivateUIKitRuntimeNames.currentPageSelector
-        )
-        guard currentPage.isFinite else {
-            return
-        }
-
-        let viewportWidth = unsafe unsafeBitCast(
-            collectionView.method(
-                for: PrivateUIKitRuntimeNames.pageViewportWidthSelector
-            ),
-            to: PageViewportWidthImplementation.self
-        )(
-            collectionView,
-            PrivateUIKitRuntimeNames.pageViewportWidthSelector,
-            currentPage
-        )
-        guard viewportWidth.isFinite, viewportWidth > 0 else {
-            return
-        }
-
-        let tolerance = 1 / max(
-            floatingTabBar.traitCollection.displayScale,
-            1
-        )
-        guard isActivelyRubberBanding(
-            collectionView,
-            viewportWidth: viewportWidth,
-            tolerance: tolerance
-        ) == false else {
-            return
-        }
-
-        if abs(collectionView.contentInset.right) > tolerance {
-            var contentInset = collectionView.contentInset
-            contentInset.right = 0
-            collectionView.contentInset = contentInset
-        }
-
-        if abs(collectionView.bounds.width - viewportWidth) > tolerance {
-            // UIKit animates the arrow reservation by moving the viewport's
-            // origin. Preserve that origin while expanding only its width.
-            var frame = collectionView.frame
-            frame.size.width = viewportWidth
-            collectionView.frame = frame
-        }
     }
 
     @available(iOS 26.0, *)
@@ -1604,26 +1647,6 @@ enum ExpandedPaginationRuntime {
             minimumOffset
         )
         return minimumOffset...maximumOffset
-    }
-
-    private static func isActivelyRubberBanding(
-        _ collectionView: UICollectionView,
-        viewportWidth: CGFloat,
-        tolerance: CGFloat
-    ) -> Bool {
-        guard collectionView.isTracking
-                || collectionView.isDragging
-                || collectionView.isDecelerating,
-              let range = naturalHorizontalScrollRange(
-                in: collectionView,
-                viewportWidth: viewportWidth
-              ) else {
-            return false
-        }
-        return collectionView.contentOffset.x
-                < range.lowerBound - tolerance
-            || collectionView.contentOffset.x
-                > range.upperBound + tolerance
     }
 
     private static func pageViewportWidth(

@@ -14,22 +14,16 @@ whose overflow items remain horizontally reachable.
 
 - iOS 18.0+
 - Swift 6.3+
-- UIKit
 
-## Ownership
+## State Ownership
 
-The app owns:
+The app remains the source of truth for each item's domain identity, membership
+and order, selected value, and corresponding content. `ScrollableTabBar`
+projects that selection into UIKit. Create a new control when membership or
+order changes.
 
-- each item's domain identity and meaning;
-- item membership and order;
-- the application's selected value and corresponding content;
-- replacement of the control when membership or order changes.
-
-`ScrollableTabBar` owns:
-
-- the UIKit projection of the current selection;
-- delivery of user selection to its delegate;
-- adaptation between its preferred floating presentation and public fallback.
+See [Selection Ownership](https://lynnswap.github.io/ScrollableTabBar/documentation/scrollabletabbar/selectionownership/)
+for programmatic and user-driven selection behavior.
 
 ## Quick Start
 
@@ -38,38 +32,29 @@ import ScrollableTabBar
 import UIKit
 
 @MainActor
-final class ReportViewController: UIViewController, ScrollableTabBarDelegate {
+final class DashboardViewController: UIViewController, ScrollableTabBarDelegate {
     enum Section: Hashable {
-        case overview
+        case summary
         case activity
         case settings
     }
 
-    private var selectedSection: Section = .overview
+    private var selectedSection: Section = .summary
 
     private lazy var sectionControl: ScrollableTabBar<Section> = {
         let control = ScrollableTabBar(
             items: [
-                .init(
-                    id: .overview,
-                    title: "Overview",
-                    accessibilityIdentifier: "Report.Section.Overview"
-                ),
-                .init(
-                    id: .activity,
-                    title: "Activity",
-                    accessibilityIdentifier: "Report.Section.Activity"
-                ),
+                .init(id: .summary, title: "Summary"),
+                .init(id: .activity, title: "Activity"),
                 .init(
                     id: .settings,
                     title: "Settings",
-                    image: UIImage(systemName: "gear"),
-                    accessibilityIdentifier: "Report.Section.Settings"
+                    image: UIImage(systemName: "gear")
                 ),
             ],
             selectedID: selectedSection
         )
-        control.accessibilityLabel = "Report Section"
+        control.accessibilityLabel = "Dashboard Section"
         control.delegate = self
         return control
     }()
@@ -94,32 +79,12 @@ final class ReportViewController: UIViewController, ScrollableTabBarDelegate {
 }
 ```
 
-## Selection Contract
-
-- `items` is fixed, nonempty, ordered, and contains unique IDs.
-- The initial and every assigned `selectedID` belongs to `items`.
-- Programmatic `selectedID` assignment updates presentation without calling
-  the delegate.
-- User selection updates `selectedID` before calling the delegate once.
-- Reselecting the current item does not call the delegate.
-- Setting `isEnabled` to `false` prevents user selection.
-
-See [Selection Ownership](Sources/ScrollableTabBar/ScrollableTabBar.docc/SelectionOwnership.md)
-for the detailed behavior contract.
-
 ## Presentation
 
 When its expected UIKit runtime contract is available, the control uses the
-system floating-tab presentation. On verified OS versions, manual dragging is
-continuous while UIKit's native page buttons remain available, and the floating
-viewport follows the width assigned by its navigation container up to the
-control's 640-point preferred maximum. Narrower containers keep overflow items
-reachable. If that contract is unavailable or changes, the control uses a
-public UIKit segmented or menu presentation while preserving selection,
-ordering, enablement, and event semantics.
-
-The number of visible items, continuous scrolling, arrow placement, pagination
-width, and exact visual treatment are intentionally not API guarantees.
+system floating-tab presentation. Otherwise, a public UIKit fallback preserves
+selection, ordering, enablement, and event semantics. Exact layout and
+appearance are not API guarantees.
 
 ## Testing
 
@@ -141,18 +106,9 @@ xcodebuild test \
   -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest'
 ```
 
-The package and external product-contract suites use Swift Testing. The demo's
-gesture automation uses XCUITest because launching and driving an application
-is owned by the XCTest UI-testing runner.
-
-`ScrollableTabBar.xcworkspace` is the combined developer entry point for the
-package and demo app. The Swift package remains the only library source of
-truth.
-
 ## Documentation
 
 - [ScrollableTabBar Documentation](https://lynnswap.github.io/ScrollableTabBar/documentation/scrollabletabbar/)
-- [Selection Ownership](https://lynnswap.github.io/ScrollableTabBar/documentation/scrollabletabbar/selectionownership/)
 
 ## License
 

@@ -27,10 +27,8 @@ struct ScrollableTabBarPresentationItem {
 
 /// A tab selector whose overflow items remain reachable through horizontal pagination.
 ///
-/// The control uses UIKit's system floating-tab presentation when its runtime contract
-/// is available, and otherwise presents the same ordered selection through public UIKit
-/// controls. When measured, the control requests up to a 640-point preferred width and
-/// accepts narrower space from its container. Use ``delegate`` to receive user selection.
+/// Use ``delegate`` to receive user selection. See <doc:SelectionOwnership> for state
+/// ownership and event behavior.
 @MainActor
 public final class ScrollableTabBar<ID: Hashable>: UIView {
     /// A tab presented by ``ScrollableTabBar``.

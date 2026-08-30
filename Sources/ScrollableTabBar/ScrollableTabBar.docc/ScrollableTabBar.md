@@ -5,9 +5,8 @@ horizontally reachable.
 
 ## Overview
 
-`ScrollableTabBar` is an iOS 18 control for compact tab selection. Give every
-item a stable domain ID, install the control as a normal UIKit view or
-`UINavigationItem.titleView`, and use ``ScrollableTabBarDelegate`` to route user
+`ScrollableTabBar` is an iOS 18 `UIView` for compact tab selection. Give every
+item a stable domain ID and use ``ScrollableTabBarDelegate`` to route user
 selection back into application state. The package requires Swift 6.3; the
 control has no explicit shutdown operation and follows the containing view
 hierarchy's lifetime.
@@ -39,6 +38,7 @@ final class DashboardViewController: UIViewController, ScrollableTabBarDelegate 
             ],
             selectedID: selectedSection
         )
+        control.accessibilityLabel = "Dashboard Section"
         control.delegate = self
         return control
     }()

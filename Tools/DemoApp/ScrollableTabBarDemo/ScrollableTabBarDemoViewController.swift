@@ -2,7 +2,7 @@ import ScrollableTabBar
 import UIKit
 
 @MainActor
-final class ViewController: UIViewController {
+final class ScrollableTabBarDemoViewController: UIViewController {
     private enum Section: String, CaseIterable {
         case overview
         case headers
@@ -63,6 +63,14 @@ final class ViewController: UIViewController {
             for: .valueChanged
         )
         navigationItem.titleView = sectionControl
+        let doneItem = UIBarButtonItem(
+            primaryAction: UIAction(
+                title: "Done",
+                image: UIImage(systemName: "checkmark")
+            ) { _ in }
+        )
+        doneItem.accessibilityIdentifier = "ScrollableTabBarDemo.Done"
+        navigationItem.rightBarButtonItem = doneItem
 
         let headingLabel = UILabel()
         headingLabel.font = .preferredFont(forTextStyle: .title1)
@@ -119,4 +127,10 @@ final class ViewController: UIViewController {
         selectionLabel.text = "Selected: \(title)"
         selectionLabel.accessibilityValue = title
     }
+}
+
+#Preview {
+    UINavigationController(
+        rootViewController: ScrollableTabBarDemoViewController()
+    )
 }

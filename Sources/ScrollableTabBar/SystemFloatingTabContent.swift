@@ -84,13 +84,17 @@ enum SystemFloatingTabRuntime {
         ) as? Bool == false,
               let tabItemsView = floatingTabBar.value(
                 forKey: PrivateUIKitRuntimeNames.itemsViewKey
-              ) as? UICollectionView else {
+              ) as? UICollectionView,
+              ExpandedPaginationRuntime.prepareCollectionView(
+                tabItemsView,
+                in: floatingTabBar
+              ) else {
             floatingTabBar.setValue(
                 nil,
                 forKey: PrivateUIKitRuntimeNames.attachedModelKey
             )
             scrollableTabBarLogger.error(
-                "UIKit's floating tab bar produced unexpected sidebar chrome; using the public adaptive tab control."
+                "UIKit's floating tab bar produced an unsupported presentation; using the public adaptive tab control."
             )
             return nil
         }

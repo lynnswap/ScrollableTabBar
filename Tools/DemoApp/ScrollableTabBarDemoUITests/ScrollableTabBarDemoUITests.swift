@@ -17,7 +17,10 @@ final class ScrollableTabBarDemoUITests: XCTestCase {
         ]
         XCTAssertTrue(selectionLabel.waitForExistence(timeout: 5))
         XCTAssertEqual(selectionLabel.label, "Selected: Overview")
-        XCTAssertTrue(app.navigationBars.buttons["Demo"].exists)
+        XCTAssertTrue(
+            app.buttons["ScrollableTabBarDemo.Done"]
+                .waitForExistence(timeout: 5)
+        )
 
         let headersTab = app.buttons[
             "ScrollableTabBarDemo.Tab.headers"
@@ -30,6 +33,58 @@ final class ScrollableTabBarDemoUITests: XCTestCase {
     }
 
     @MainActor
+    func testSelectsPartiallyVisibleTabAfterContinuousDrag() {
+        let app = XCUIApplication()
+        app.launch()
+
+        let previewTab = app.buttons[
+            "ScrollableTabBarDemo.Tab.preview"
+        ].firstMatch
+        XCTAssertTrue(previewTab.waitForExistence(timeout: 5))
+
+        let startPoint = app.coordinate(
+            withNormalizedOffset: .zero
+        ).withOffset(
+            CGVector(
+                dx: previewTab.frame.midX,
+                dy: previewTab.frame.midY
+            )
+        )
+        let endPoint = startPoint.withOffset(
+            CGVector(dx: -60, dy: 0)
+        )
+        startPoint.press(
+            forDuration: 0.05,
+            thenDragTo: endPoint
+        )
+
+        let partiallyVisiblePoint = app.coordinate(
+            withNormalizedOffset: .zero
+        ).withOffset(
+            CGVector(
+                dx: previewTab.frame.maxX + 5,
+                dy: previewTab.frame.midY
+            )
+        )
+        partiallyVisiblePoint.tap()
+
+        let selectionLabel = app.staticTexts[
+            "ScrollableTabBarDemo.SelectionLabel"
+        ]
+        let selectedCookies = XCTNSPredicateExpectation(
+            predicate: NSPredicate(
+                format: "label == %@",
+                "Selected: Cookies"
+            ),
+            object: selectionLabel
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [selectedCookies], timeout: 5),
+            .completed
+        )
+    }
+
+    @MainActor
     func testSelectsOverflowItemAcrossAvailablePresentation() throws {
         let app = XCUIApplication()
         app.launch()
@@ -39,14 +94,7 @@ final class ScrollableTabBarDemoUITests: XCTestCase {
         let nextPageButton = app.buttons["Next Page"].firstMatch
 
         if nextPageButton.waitForExistence(timeout: 2) {
-            // Seven demo items can require at most six forward page transitions.
-            for _ in 0..<6 {
-                guard nextPageButton.exists, nextPageButton.isHittable else {
-                    break
-                }
-                nextPageButton.tap()
-            }
-            XCTAssertFalse(nextPageButton.exists && nextPageButton.isHittable)
+            advanceToLastPage(nextPageButton)
         } else if responseQuery.firstMatch.exists == false {
             let menuButton = try XCTUnwrap(
                 hittableButton(
@@ -77,6 +125,18 @@ final class ScrollableTabBarDemoUITests: XCTestCase {
             XCTWaiter.wait(for: [selectedResponse], timeout: 5),
             .completed
         )
+    }
+
+    @MainActor
+    private func advanceToLastPage(_ nextPageButton: XCUIElement) {
+        // Seven demo items can require at most six forward page transitions.
+        for _ in 0..<6 {
+            guard nextPageButton.exists, nextPageButton.isHittable else {
+                break
+            }
+            nextPageButton.tap()
+        }
+        XCTAssertFalse(nextPageButton.exists && nextPageButton.isHittable)
     }
 
     @MainActor

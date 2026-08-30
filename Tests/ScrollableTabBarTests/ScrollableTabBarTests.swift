@@ -120,35 +120,20 @@ struct ScrollableTabBarTests {
     }
 
     @Test
-    func requestsTheNavigationContainerAvailableWidth() {
+    func capsWideSizingAndHonorsNarrowContainerProposals() {
         let control = makeControl(selectedID: .headers)
+        let preferredSize = CGSize(width: 640, height: 49)
 
-        #expect(
-            control.intrinsicContentSize
-                == CGSize(
-                    width: UIView.layoutFittingExpandedSize.width,
-                    height: 49
-                )
-        )
+        #expect(control.intrinsicContentSize == preferredSize)
         #expect(
             control.sizeThatFits(CGSize(width: 314, height: 1))
                 == CGSize(width: 314, height: 49)
         )
-        let largerProposal = CGSize(
-            width: UIView.layoutFittingExpandedSize.width + 1,
-            height: 1
-        )
         #expect(
-            control.sizeThatFits(largerProposal)
-                == CGSize(width: largerProposal.width, height: 49)
+            control.sizeThatFits(CGSize(width: 1_024, height: 1))
+                == preferredSize
         )
-        #expect(
-            control.sizeThatFits(.zero)
-                == CGSize(
-                    width: UIView.layoutFittingExpandedSize.width,
-                    height: 49
-                )
-        )
+        #expect(control.sizeThatFits(.zero) == preferredSize)
     }
 
     private func makeControl(selectedID: TabID) -> ScrollableTabBar<TabID> {

@@ -113,10 +113,11 @@ for the detailed behavior contract.
 When its expected UIKit runtime contract is available, the control uses the
 system floating-tab presentation. On verified OS versions, manual dragging is
 continuous while UIKit's native page buttons remain available, and the floating
-viewport follows the width assigned by its navigation container. If that
-contract is unavailable or changes, it uses a public UIKit segmented or menu
-presentation while preserving selection, ordering, enablement, and event
-semantics.
+viewport follows the width assigned by its navigation container up to the
+control's 640-point preferred maximum. Narrower containers keep overflow items
+reachable. If that contract is unavailable or changes, the control uses a
+public UIKit segmented or menu presentation while preserving selection,
+ordering, enablement, and event semantics.
 
 The number of visible items, continuous scrolling, arrow placement, pagination
 width, and exact visual treatment are intentionally not API guarantees.

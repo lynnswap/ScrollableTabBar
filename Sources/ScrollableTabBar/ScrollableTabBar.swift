@@ -29,8 +29,9 @@ struct ScrollableTabBarPresentationItem {
 ///
 /// The control uses UIKit's system floating-tab presentation when its runtime contract
 /// is available, and otherwise presents the same ordered selection through public UIKit
-/// controls. The control requests the horizontal space available to a navigation title
-/// view. Listen for user selection with `UIControl.Event.valueChanged`.
+/// controls. When measured, the control requests up to a 640-point preferred width and
+/// accepts narrower space from its container. Listen for user selection with
+/// `UIControl.Event.valueChanged`.
 @MainActor
 public final class ScrollableTabBar<ID: Hashable>: UIControl {
     /// A tab presented by ``ScrollableTabBar``.
@@ -102,12 +103,10 @@ public final class ScrollableTabBar<ID: Hashable>: UIControl {
         }
     }
 
-    // UINavigationBar may resize a custom title view around its bar items. Request
-    // the standard expanded fitting width so the container, rather than a device-specific
-    // cap, owns the final width.
-    private static var expandedFittingWidth: CGFloat {
-        UIView.layoutFittingExpandedSize.width
-    }
+    // The navigation container still owns compression below this component policy.
+    // Capping the preferred width prevents spare title area from becoming empty glass
+    // while retaining overflow as a normal presentation state.
+    private static var preferredMaximumWidth: CGFloat { 640 }
 
     let content: any ScrollableTabBarContent
     private let itemIndexByID: [ID: Int]
@@ -179,13 +178,13 @@ public final class ScrollableTabBar<ID: Hashable>: UIControl {
     }
 
     public override var intrinsicContentSize: CGSize {
-        CGSize(width: Self.expandedFittingWidth, height: content.intrinsicHeight)
+        CGSize(width: Self.preferredMaximumWidth, height: content.intrinsicHeight)
     }
 
     public override func sizeThatFits(_ size: CGSize) -> CGSize {
         let proposedWidth = size.width > 0 && size.width.isFinite
-            ? size.width
-            : Self.expandedFittingWidth
+            ? min(size.width, Self.preferredMaximumWidth)
+            : Self.preferredMaximumWidth
         return CGSize(
             width: proposedWidth,
             height: content.heightThatFits(size)

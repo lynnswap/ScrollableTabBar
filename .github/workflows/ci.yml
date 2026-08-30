@@ -31,18 +31,7 @@ jobs:
           xcodebuild -showsdks
           echo "Destination: ${DESTINATION}"
 
-      - name: Run external product contract
-        working-directory: ContractTests
-        run: |
-          xcodebuild test \
-            -scheme ScrollableTabBarProductContract-Package \
-            -destination "${DESTINATION}" \
-            -parallel-testing-enabled NO \
-            -enableCodeCoverage NO \
-            -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-Contract" \
-            -resultBundlePath "${RUNNER_TEMP}/ScrollableTabBar-Contract.xcresult"
-
-      - name: Run package and demo UI tests
+      - name: Run package, product contract, and demo UI tests
         run: |
           xcodebuild test \
             -workspace ScrollableTabBar.xcworkspace \
@@ -61,7 +50,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-results
-          path: ${{ runner.temp }}/ScrollableTabBar-*.xcresult
+          path: ${{ runner.temp }}/ScrollableTabBar-Workspace.xcresult
           if-no-files-found: ignore
           retention-days: 7
           include-hidden-files: true

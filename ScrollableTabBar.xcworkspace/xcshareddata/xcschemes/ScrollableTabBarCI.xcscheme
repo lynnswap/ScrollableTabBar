@@ -28,6 +28,16 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "ScrollableTabBarProductContractTests"
+               BuildableName = "ScrollableTabBarProductContractTests"
+               BlueprintName = "ScrollableTabBarProductContractTests"
+               ReferencedContainer = "container:ContractTests">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "AB4D7FEE3039E74F0021F2C5"
                BuildableName = "ScrollableTabBarDemoUITests.xctest"
                BlueprintName = "ScrollableTabBarDemoUITests"

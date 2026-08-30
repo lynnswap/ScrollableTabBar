@@ -151,8 +151,8 @@ truth.
 
 ## Documentation
 
-- [ScrollableTabBar DocC](Sources/ScrollableTabBar/ScrollableTabBar.docc/ScrollableTabBar.md)
-- [Selection Ownership](Sources/ScrollableTabBar/ScrollableTabBar.docc/SelectionOwnership.md)
+- [ScrollableTabBar Documentation](https://lynnswap.github.io/ScrollableTabBar/documentation/scrollabletabbar/)
+- [Selection Ownership](https://lynnswap.github.io/ScrollableTabBar/documentation/scrollabletabbar/selectionownership/)
 
 ## License
 

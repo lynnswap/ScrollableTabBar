@@ -16,78 +16,43 @@ concurrency:
 
 jobs:
   test:
-    name: ${{ matrix.job_name }}
+    name: Xcode 26.6, iOS 26.5, Product Contract, Documentation, and Demo
     runs-on: macos-26
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - job_name: Minimum iOS 18.0 Package
-            simulator_version: '18.0'
-            simulator_device: iPhone 16
-            install_runtime: true
-            full_suite: false
-          - job_name: Latest Runtime, Product Contract, Documentation, and Demo
-            simulator_version: ''
-            simulator_device: iPhone 17
-            install_runtime: false
-            full_suite: true
     env:
-      XCODE_MAJOR: '26'
-      SIMULATOR_VERSION: ${{ matrix.simulator_version }}
-      SIMULATOR_DEVICE: ${{ matrix.simulator_device }}
+      XCODE_VERSION: '26.6.0'
+      SIMULATOR_VERSION: '26.5'
+      SIMULATOR_DEVICE: iPhone 17
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Resolve stable Xcode
+      - name: Resolve pinned Xcode
         run: |
-          ruby <<'RUBY'
-          major = ENV.fetch("XCODE_MAJOR")
-          candidates = Dir["/Applications/Xcode*.app"].select { |candidate| File.directory?(candidate) }
-          candidates.select! do |candidate|
-            File.basename(candidate).match?(/Xcode_#{Regexp.escape(major)}(?:[_.-]|\z)/)
-          end
-          candidates.reject! do |candidate|
-            [candidate, File.realpath(candidate)].any? do |label|
-              File.basename(label).downcase.match?(/beta|release[ _-]?candidate|(?:^|[_. -])rc(?:$|[_. -])/)
-            end
-          end
+          xcode_path="/Applications/Xcode_${XCODE_VERSION}.app"
+          test -d "${xcode_path}"
+          echo "DEVELOPER_DIR=${xcode_path}/Contents/Developer" >> "${GITHUB_ENV}"
+          echo "Resolved Xcode: ${xcode_path}"
 
-          def version_components(candidate)
-            version = File.basename(candidate)[/Xcode[_-](\d+(?:[._]\d+)*)/, 1]
-            version.to_s.tr("_", ".").split(".").map(&:to_i)
-          end
-
-          selected = candidates.max_by { |candidate| version_components(candidate) }
-          abort("No stable Xcode #{major} installation found") unless selected
-
-          File.open(ENV.fetch("GITHUB_ENV"), "a") do |environment|
-            environment.puts "DEVELOPER_DIR=#{selected}/Contents/Developer"
-          end
-          puts "Resolved Xcode: #{selected}"
-          RUBY
-
-      - name: Install and resolve minimum iOS Simulator
-        if: matrix.install_runtime
+      - name: Create and boot pinned iOS Simulator
         run: |
-          xcrun simctl list > /dev/null
-          xcodebuild -downloadPlatform iOS \
-            -buildVersion "${SIMULATOR_VERSION}"
-
           ruby <<'RUBY'
           require "json"
 
           requested_version = ENV.fetch("SIMULATOR_VERSION")
           requested_device = ENV.fetch("SIMULATOR_DEVICE")
-          runtimes = JSON.parse(`xcrun simctl list runtimes available --json`).fetch("runtimes")
+          runtimes = JSON.parse(
+            `xcrun simctl list runtimes available --json`
+          ).fetch("runtimes")
           runtime = runtimes.find do |candidate|
-            candidate.fetch("version") == requested_version
+            candidate.fetch("platform") == "iOS" &&
+              candidate.fetch("version") == requested_version
           end
           abort("No available iOS #{requested_version} runtime found") unless runtime
 
-          device_types = JSON.parse(`xcrun simctl list devicetypes --json`).fetch("devicetypes")
+          device_types = JSON.parse(
+            `xcrun simctl list devicetypes --json`
+          ).fetch("devicetypes")
           device_type = device_types.find do |candidate|
             candidate.fetch("name") == requested_device
           end
@@ -100,41 +65,15 @@ jobs:
           ], &:read).strip
           abort("Failed to create #{device_name}") unless $?.success? && udid.empty? == false
 
+          system("xcrun", "simctl", "boot", udid) ||
+            abort("Failed to boot #{device_name}")
+
           File.open(ENV.fetch("GITHUB_ENV"), "a") do |environment|
-            environment.puts "DESTINATION=platform=iOS Simulator,id=#{udid}"
+            environment.puts(
+              "DESTINATION=platform=iOS Simulator,arch=arm64,id=#{udid}"
+            )
           end
-          puts "Resolved simulator: #{requested_device} iOS #{requested_version} (#{udid})"
-          RUBY
-
-      - name: Resolve latest iOS Simulator
-        if: ${{ ! matrix.install_runtime }}
-        run: |
-          ruby <<'RUBY'
-          require "json"
-
-          requested_device = ENV.fetch("SIMULATOR_DEVICE")
-          runtimes = JSON.parse(`xcrun simctl list devices available --json`).fetch("devices")
-          candidates = runtimes.flat_map do |runtime, devices|
-            match = runtime.match(/SimRuntime\.iOS-(\d+(?:-\d+)*)$/)
-            next [] unless match
-
-            version = match[1].tr("-", ".")
-            devices.filter_map do |device|
-              next unless device.fetch("isAvailable", true)
-              next unless device.fetch("name") == requested_device
-
-              [version.split(".").map(&:to_i), version, device.fetch("udid")]
-            end
-          end
-
-          selected = candidates.max_by(&:first)
-          abort("No available #{requested_device} simulator found") unless selected
-
-          _, version, udid = selected
-          File.open(ENV.fetch("GITHUB_ENV"), "a") do |environment|
-            environment.puts "DESTINATION=platform=iOS Simulator,id=#{udid}"
-          end
-          puts "Resolved simulator: #{requested_device} iOS #{version} (#{udid})"
+          puts "Created simulator: #{requested_device} iOS #{requested_version} (#{udid})"
           RUBY
 
       - name: Show build environment
@@ -150,30 +89,29 @@ jobs:
             -scheme ScrollableTabBarTests \
             -destination "${DESTINATION}" \
             -parallel-testing-enabled NO \
-            -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-Package"
+            -enableCodeCoverage NO \
+            -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-Workspace"
 
       - name: Run external product contract
-        if: matrix.full_suite
         working-directory: ContractTests
         run: |
           xcodebuild test \
             -scheme ScrollableTabBarProductContract-Package \
             -destination "${DESTINATION}" \
             -parallel-testing-enabled NO \
+            -enableCodeCoverage NO \
             -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-Contract"
 
       - name: Build DocC with warnings as errors
-        if: matrix.full_suite
         run: |
           xcodebuild docbuild \
             -scheme ScrollableTabBar \
             -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-DocC" \
+            -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-Workspace" \
             OTHER_DOCC_FLAGS='--warnings-as-errors' \
             CODE_SIGNING_ALLOWED=NO
 
       - name: Run demo UI smoke test
-        if: matrix.full_suite
         run: |
           xcodebuild test \
             -workspace ScrollableTabBar.xcworkspace \
@@ -181,15 +119,28 @@ jobs:
             -destination "${DESTINATION}" \
             -only-testing:ScrollableTabBarDemoUITests \
             -parallel-testing-enabled NO \
-            -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-DemoTests"
+            -enableCodeCoverage NO \
+            -testLanguage en \
+            -testRegion US \
+            -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-Workspace" \
+            -resultBundlePath "${RUNNER_TEMP}/ScrollableTabBar-DemoTests.xcresult"
+
+      - name: Upload failed demo UI test result
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: demo-ui-test-result
+          path: ${{ runner.temp }}/ScrollableTabBar-DemoTests.xcresult
+          if-no-files-found: ignore
+          retention-days: 7
+          include-hidden-files: true
 
       - name: Build Release demo
-        if: matrix.full_suite
         run: |
           xcodebuild build \
             -workspace ScrollableTabBar.xcworkspace \
             -scheme ScrollableTabBarDemo \
             -configuration Release \
             -destination "${DESTINATION}" \
-            -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-DemoRelease" \
+            -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-Workspace" \
             CODE_SIGNING_ALLOWED=NO

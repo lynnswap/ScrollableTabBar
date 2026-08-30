@@ -2,8 +2,10 @@ import ScrollableTabBar
 import UIKit
 
 @MainActor
-final class ScrollableTabBarDemoViewController: UIViewController {
-    private enum Section: String, CaseIterable {
+final class ScrollableTabBarDemoViewController: UIViewController,
+    ScrollableTabBarDelegate
+{
+    enum Section: String, CaseIterable {
         case overview
         case headers
         case preview
@@ -57,11 +59,7 @@ final class ScrollableTabBarDemoViewController: UIViewController {
 
         sectionControl.accessibilityIdentifier = "ScrollableTabBarDemo.Control"
         sectionControl.accessibilityLabel = "Inspector section"
-        sectionControl.addTarget(
-            self,
-            action: #selector(selectionDidChange),
-            for: .valueChanged
-        )
+        sectionControl.delegate = self
         navigationItem.titleView = sectionControl
         let doneItem = UIBarButtonItem(
             primaryAction: UIAction(
@@ -112,18 +110,18 @@ final class ScrollableTabBarDemoViewController: UIViewController {
             ),
         ])
 
-        renderSelection()
+        renderSelection(sectionControl.selectedID)
     }
 
-    @objc
-    private func selectionDidChange() {
-        renderSelection()
+    func scrollableTabBar(
+        _ tabBar: ScrollableTabBar<Section>,
+        didSelect selectedID: Section
+    ) {
+        renderSelection(selectedID)
     }
 
-    private func renderSelection() {
-        let title = Section.allCases
-            .first(where: { $0 == sectionControl.selectedID })!
-            .title
+    private func renderSelection(_ selectedID: Section) {
+        let title = selectedID.title
         selectionLabel.text = "Selected: \(title)"
         selectionLabel.accessibilityValue = title
     }

@@ -34,9 +34,10 @@ final class AdaptiveTabContent: ScrollableTabBarContent {
             segmentedControl: segmentedControl,
             menuButton: menuButton
         )
-        segmentedControl.addTarget(
-            self,
-            action: #selector(valueChanged(_:)),
+        segmentedControl.addAction(
+            UIAction { [weak self] _ in
+                self?.valueChanged()
+            },
             for: .valueChanged
         )
     }
@@ -88,14 +89,14 @@ final class AdaptiveTabContent: ScrollableTabBarContent {
         max(scrollableTabBarMinimumHeight, adaptiveView.sizeThatFits(size).height)
     }
 
-    @objc func valueChanged(_ sender: UISegmentedControl) {
-        guard items.indices.contains(sender.selectedSegmentIndex) else {
+    private func valueChanged() {
+        guard items.indices.contains(segmentedControl.selectedSegmentIndex) else {
             scrollableTabBarLogger.fault(
                 "UISegmentedControl selected an item outside ScrollableTabBar's membership."
             )
             return
         }
-        selectionHandler?(sender.selectedSegmentIndex)
+        selectionHandler?(segmentedControl.selectedSegmentIndex)
     }
 }
 

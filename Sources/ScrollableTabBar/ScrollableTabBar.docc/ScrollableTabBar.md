@@ -7,9 +7,9 @@ horizontally reachable.
 
 `ScrollableTabBar` is an iOS 18 control for compact tab selection. Give every
 item a stable domain ID, install the control as a normal UIKit view or
-`UINavigationItem.titleView`, and use `UIControl.Event.valueChanged` to route
-user selection back into application state. The package requires Swift 6.3;
-the control has no explicit shutdown operation and follows the containing view
+`UINavigationItem.titleView`, and use ``ScrollableTabBarDelegate`` to route user
+selection back into application state. The package requires Swift 6.3; the
+control has no explicit shutdown operation and follows the containing view
 hierarchy's lifetime.
 
 ```swift
@@ -17,8 +17,8 @@ import ScrollableTabBar
 import UIKit
 
 @MainActor
-final class DashboardViewController: UIViewController {
-    private enum Section: Hashable {
+final class DashboardViewController: UIViewController, ScrollableTabBarDelegate {
+    enum Section: Hashable {
         case summary
         case activity
         case settings
@@ -39,11 +39,7 @@ final class DashboardViewController: UIViewController {
             ],
             selectedID: selectedSection
         )
-        control.addTarget(
-            self,
-            action: #selector(sectionSelectionChanged),
-            for: .valueChanged
-        )
+        control.delegate = self
         return control
     }()
 
@@ -53,9 +49,12 @@ final class DashboardViewController: UIViewController {
         showSection(selectedSection)
     }
 
-    @objc private func sectionSelectionChanged() {
-        selectedSection = sectionControl.selectedID
-        showSection(selectedSection)
+    func scrollableTabBar(
+        _ tabBar: ScrollableTabBar<Section>,
+        didSelect selectedID: Section
+    ) {
+        selectedSection = selectedID
+        showSection(selectedID)
     }
 
     private func showSection(_ section: Section) {
@@ -82,6 +81,7 @@ state.
 - <doc:SelectionOwnership>
 - ``ScrollableTabBar/init(items:selectedID:)``
 - ``ScrollableTabBar/Item``
+- ``ScrollableTabBarDelegate``
 
 ### Reading State
 

@@ -41,7 +41,7 @@ struct AdaptiveTabContentTests {
     }
 
     @Test
-    func segmentedSelectionUsesTheNormalValueChangedPath() {
+    func segmentedSelectionUsesItsUIActionPath() {
         let content = makeContent()
         var selectedIndices: [Int] = []
         content.selectionHandler = { index in
@@ -55,7 +55,7 @@ struct AdaptiveTabContentTests {
         )
 
         content.segmentedControl.selectedSegmentIndex = 3
-        content.valueChanged(content.segmentedControl)
+        content.segmentedControl.sendActions(for: .valueChanged)
 
         #expect(selectedIndices == [3])
     }

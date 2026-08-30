@@ -28,7 +28,7 @@ The app owns:
 `ScrollableTabBar` owns:
 
 - the UIKit projection of the current selection;
-- delivery of user selection through `UIControl.Event.valueChanged`;
+- delivery of user selection to its delegate;
 - adaptation between its preferred floating presentation and public fallback.
 
 ## Quick Start
@@ -38,8 +38,8 @@ import ScrollableTabBar
 import UIKit
 
 @MainActor
-final class ReportViewController: UIViewController {
-    private enum Section: Hashable {
+final class ReportViewController: UIViewController, ScrollableTabBarDelegate {
+    enum Section: Hashable {
         case overview
         case activity
         case settings
@@ -70,11 +70,7 @@ final class ReportViewController: UIViewController {
             selectedID: selectedSection
         )
         control.accessibilityLabel = "Report Section"
-        control.addTarget(
-            self,
-            action: #selector(sectionSelectionChanged),
-            for: .valueChanged
-        )
+        control.delegate = self
         return control
     }()
 
@@ -84,9 +80,12 @@ final class ReportViewController: UIViewController {
         showSection(selectedSection)
     }
 
-    @objc private func sectionSelectionChanged() {
-        selectedSection = sectionControl.selectedID
-        showSection(selectedSection)
+    func scrollableTabBar(
+        _ tabBar: ScrollableTabBar<Section>,
+        didSelect selectedID: Section
+    ) {
+        selectedSection = selectedID
+        showSection(selectedID)
     }
 
     private func showSection(_ section: Section) {
@@ -99,10 +98,10 @@ final class ReportViewController: UIViewController {
 
 - `items` is fixed, nonempty, ordered, and contains unique IDs.
 - The initial and every assigned `selectedID` belongs to `items`.
-- Programmatic `selectedID` assignment updates presentation without sending
-  `.valueChanged`.
-- User selection updates `selectedID` before sending one `.valueChanged`.
-- Reselecting the current item sends no event.
+- Programmatic `selectedID` assignment updates presentation without calling
+  the delegate.
+- User selection updates `selectedID` before calling the delegate once.
+- Reselecting the current item does not call the delegate.
 - Setting `isEnabled` to `false` prevents user selection.
 
 See [Selection Ownership](Sources/ScrollableTabBar/ScrollableTabBar.docc/SelectionOwnership.md)

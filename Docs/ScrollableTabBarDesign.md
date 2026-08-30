@@ -3,6 +3,7 @@
 Status: Accepted
 Branch: `codex/extract-scrollable-tab-bar`
 Baseline: `9a04ea93b48522f7e4c4895199dcec5016033b13`
+Selection-delivery revision: `codex/selection-delegate`
 
 ## Scope Contract
 
@@ -10,7 +11,7 @@ Baseline: `9a04ea93b48522f7e4c4895199dcec5016033b13`
 
 Ship `ScrollableTabBar` as an independently versioned Swift package so that
 WebInspectorKit can later replace its same-package target with an exact remote
-dependency without changing the Network consumer source.
+dependency and an explicit migration to the package's typed delegate contract.
 
 ### Consumers
 
@@ -23,8 +24,9 @@ dependency without changing the Network consumer source.
 
 ### Compatibility
 
-- Preserve the public API and observable selection semantics already merged in
-  WebInspectorKit.
+- Preserve selection ownership, ordering, and callback conditions already
+  merged in WebInspectorKit while replacing target/action delivery with a typed
+  delegate before the first standalone release.
 - Preserve the existing iOS 18.0 minimum. `UITab.isEnabled` remains guarded at
   iOS 18.4. This intentionally retains the existing consumer contract rather
   than raising the floor to the default iOS 18.4 design baseline.
@@ -48,9 +50,10 @@ dependency without changing the Network consumer source.
    API.
 2. The merged WebInspectorKit implementation is already a leaf product with no
    dependencies and a complete public consumer story.
-3. The existing public surface consists of one `UIControl` owner, its nested
-   immutable item value, and inherited UIKit target/action behavior. No second
-   product or public protocol is justified.
+3. The source implementation used `UIControl` target/action, but its public
+   abstraction is a tab bar. UIKit's direct `UITabBar` analog reports selection
+   through a weak delegate, so the standalone Swift-only surface uses the same
+   ownership shape without an Objective-C selector requirement.
 4. All four implementation files are currently wrapped in
    `#if canImport(UIKit)` because their source package also supports macOS. In a
    standalone UIKit-only package those guards would make macOS builds appear to
@@ -123,7 +126,17 @@ package and a demo app project. The workspace is a developer entry point only:
 import UIKit
 
 @MainActor
-public final class ScrollableTabBar<ID: Hashable>: UIControl {
+public protocol ScrollableTabBarDelegate<SelectionID>: AnyObject {
+    associatedtype SelectionID: Hashable
+
+    func scrollableTabBar(
+        _ tabBar: ScrollableTabBar<SelectionID>,
+        didSelect selectedID: SelectionID
+    )
+}
+
+@MainActor
+public final class ScrollableTabBar<ID: Hashable>: UIView {
     public struct Item: Identifiable {
         public let id: ID
         public let title: String
@@ -140,50 +153,81 @@ public final class ScrollableTabBar<ID: Hashable>: UIControl {
 
     public let items: [Item]
     public var selectedID: ID { get set }
+    public weak var delegate: (any ScrollableTabBarDelegate<ID>)?
+    public var isEnabled: Bool
 
     public init(items: [Item], selectedID: ID)
 }
 ```
 
-Inherited `UIControl` APIs remain the event and enablement surface. No public
-protocol, delegate, runtime strategy, or UIKit-private type is added.
+The delegate is weak and receives the selected domain ID after state and
+presentation update. The tab bar does not retain target/action as a second
+delivery surface. Keeping the superclass as `UIView`, like `UITabBar`, makes an
+unmigrated `addAction` consumer fail to compile instead of silently losing
+callbacks. Runtime strategy and UIKit-private types remain internal.
 
 ### Public invariants
 
 - `items` is nonempty and ordered.
 - Item IDs are unique.
 - Initial and assigned selections belong to `items`.
-- Programmatic selection updates the projection without sending
-  `.valueChanged`.
-- User selection updates `selectedID` before sending exactly one
-  `.valueChanged`; reselecting sends nothing.
+- Programmatic selection updates the projection without calling the delegate.
+- User selection updates `selectedID` before calling the delegate exactly once;
+  reselecting does not call it.
 - `isEnabled == false` prevents user selection and updates presentation state.
 - When measured, the control requests a 640-point preferred maximum and honors
   narrower finite container proposals so overflow remains reachable.
 
 ## Consumer Code
 
-WebInspectorKit before extraction already uses the intended external contract:
+WebInspectorKit migrates its selection callback to the standalone contract:
 
 ```swift
 import ScrollableTabBar
 
-let control = ScrollableTabBar(
-    items: Mode.allCases.map { mode in
-        .init(id: mode, title: mode.title)
-    },
-    selectedID: mode
-)
-control.addAction(selectionAction, for: .valueChanged)
-navigationItem.titleView = control
+@MainActor
+final class NetworkDetailViewController: UIViewController,
+    ScrollableTabBarDelegate
+{
+    enum Mode: CaseIterable, Hashable {
+        case overview
+        case headers
+
+        var title: String {
+            switch self {
+            case .overview: "Overview"
+            case .headers: "Headers"
+            }
+        }
+    }
+
+    private var mode: Mode = .overview
+
+    private lazy var control: ScrollableTabBar<Mode> = {
+        let control = ScrollableTabBar(
+            items: Mode.allCases.map { mode in
+                .init(id: mode, title: mode.title)
+            },
+            selectedID: mode
+        )
+        control.delegate = self
+        return control
+    }()
+
+    func scrollableTabBar(
+        _ tabBar: ScrollableTabBar<Mode>,
+        didSelect selectedID: Mode
+    ) {
+        mode = selectedID
+    }
+}
 ```
 
-After the standalone release, this source remains unchanged. Only
-WebInspectorKit's package dependency declaration changes from a local target to
-an exact remote product.
+After the standalone release, WebInspectorKit changes both its package
+dependency declaration and its selection callback registration in one migration.
 
 The contract fixture and demo app use their own domain ID enums with the same
-initializer, `selectedID`, `isEnabled`, and target/action APIs. Neither may use
+initializer, `selectedID`, `isEnabled`, and delegate API. Neither may use
 `@testable`, WebInspector types, or internal runtime state.
 
 ## Ownership and Lifecycle
@@ -202,6 +246,9 @@ initializer, `selectedID`, `isEnabled`, and target/action APIs. Neither may use
 | App scene, navigation hierarchy, and displayed content | Demo app |
 
 `ScrollableTabBar` retains one content implementation for its lifetime.
+The consumer retains its delegate; `ScrollableTabBar` holds only a weak
+reference. Removing the consumer releases that connection without explicit
+teardown.
 `SystemFloatingTabContent` retains the hidden `UITabBarController`, tabs,
 collection view, and floating view as one lifecycle unit. Teardown removes the
 delegate, detaches the private tab model, and clears the controller tabs. The
@@ -247,6 +294,7 @@ personal vendor prefix.
 ```text
 Sources/ScrollableTabBar/
   ScrollableTabBar.swift
+  ScrollableTabBarDelegate.swift
   PrivateUIKitRuntimeNames.swift
   SystemFloatingTabContent.swift
   ExpandedPaginationRuntime.swift
@@ -283,10 +331,13 @@ package has no external runtime dependency.
 The only public declarations are:
 
 - `ScrollableTabBar`
+- `ScrollableTabBarDelegate`, its primary associated type, and selection method
 - `ScrollableTabBar.Item`
 - the four item properties and item initializer
 - `ScrollableTabBar.items`
 - `ScrollableTabBar.selectedID`
+- `ScrollableTabBar.delegate`
+- `ScrollableTabBar.isEnabled`
 - the control initializer
 
 UIKit overrides required by the control remain public only where Swift requires
@@ -309,6 +360,9 @@ behavior of the final public control.
 7. Add external product contract and demo app; do not copy WebInspector-specific
    fixtures, localization, or Network tests.
 8. Leave WebInspectorKit unchanged until a standalone release is available.
+9. Replace target/action selection delivery with a weak typed delegate before
+   the first release, and require the later WebInspectorKit dependency migration
+   to adopt it.
 
 ## Avoided Shapes
 
@@ -321,14 +375,16 @@ behavior of the final public control.
   only `Selector` values.
 - Do not add WebInspector compatibility wrappers or copy Network policy into the
   provider repository.
+- Do not keep target/action and delegate as two selection-delivery contracts;
+  callback ordering and ownership have one public source of truth.
 - Do not commit generated `.swiftpm` workspace or user data.
 
 ## Test Plan
 
 ### Package owner tests on iOS Simulator
 
-- membership, identity, programmatic selection, event count/order, reselect,
-  invalid selection, enablement, and sizing;
+- membership, identity, programmatic selection, delegate count/order and weak
+  ownership, reselect, invalid selection, enablement, and sizing;
 - segmented/menu fallback parity, trait changes, Dynamic Type, and
   accessibility projection;
 - real floating hierarchy, stable `UITab` identity, continuous manual
@@ -346,7 +402,7 @@ behavior of the final public control.
 
 - render seven public items in a real `UINavigationController` title view;
 - activate a visible tab through an actual touch and observe the app label
-  update through `.valueChanged`;
+  update through the typed delegate;
 - page to and activate an initially hidden item using an actual gesture;
 - run on phone and iPad for compact paging and regular-width presentation;
 - retain manual screenshot checks for Liquid Glass, dark mode, and localization.
@@ -365,7 +421,7 @@ behavior of the final public control.
 | --- | --- |
 | 1: empty scaffold | Migration items 1 and 3 |
 | 2: complete leaf implementation | Single product/target graph |
-| 3: minimal public surface | Public API and access-control plan |
+| 3: UIKit tab delegate analog | Public API and access-control plan |
 | 4: misleading platform gates | iOS-only package and wrapper deletion |
 | 5: package tests cover native owners | Package owner test layer |
 | 6: app-only runtime evidence remains | Demo app, UI tests, and workspace |
@@ -377,8 +433,8 @@ behavior of the final public control.
 
 - The standalone package exposes the exact approved public surface and no
   WebInspector types.
-- WebInspectorKit's current consumer source compiles unchanged against the
-  standalone product in a local compatibility probe.
+- The external contract fixture compiles the same typed delegate story planned
+  for the later WebInspectorKit migration.
 - Product, target, and dependency graph match this document.
 - Package, external contract, and demo UI tests pass on the supported runtime
   matrix.
@@ -390,7 +446,7 @@ behavior of the final public control.
 Implementation begins after approval of these decisions:
 
 1. one iOS-only SwiftPM product and implementation target;
-2. unchanged Swift-only generic public API and iOS 18.0 floor;
+2. Swift-only generic API with a weak typed delegate and iOS 18.0 floor;
 3. separate external contract package;
 4. thin demo app plus UI tests, with a workspace only as the combined developer
    entry point;

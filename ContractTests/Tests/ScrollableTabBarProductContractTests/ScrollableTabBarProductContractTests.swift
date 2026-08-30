@@ -10,27 +10,22 @@ private enum ContractWorkspaceSection: Hashable {
 
 @MainActor
 @Test
-func publicProductSupportsTypedSelectionAndUIControlEvents() {
+func publicProductSupportsTypedSelectionAndDelegateCallbacks() {
     let viewController = ContractWorkspaceViewController()
     viewController.loadViewIfNeeded()
     let control = viewController.sectionControl
-    let recorder = ContractSelectionRecorder()
-    control.addTarget(
-        recorder,
-        action: #selector(ContractSelectionRecorder.valueChanged),
-        for: .valueChanged
-    )
 
     #expect(control.items.map(\.id) == [.canvas, .activity, .settings])
     #expect(control.items.last?.accessibilityIdentifier == "Contract.Workspace.Settings")
     #expect(control.selectedID == .canvas)
+    #expect(control.delegate === viewController)
     #expect(viewController.navigationItem.titleView === control)
     #expect(viewController.renderedSection == .canvas)
 
     control.selectedID = .settings
 
     #expect(control.selectedID == .settings)
-    #expect(recorder.eventCount == 0)
+    #expect(viewController.delegateCallCount == 0)
     #expect(viewController.renderedSection == .canvas)
     #expect(control.isEnabled)
 
@@ -39,9 +34,12 @@ func publicProductSupportsTypedSelectionAndUIControlEvents() {
 }
 
 @MainActor
-private final class ContractWorkspaceViewController: UIViewController {
+private final class ContractWorkspaceViewController: UIViewController,
+    ScrollableTabBarDelegate
+{
     private var selectedSection: ContractWorkspaceSection = .canvas
     private(set) var renderedSection: ContractWorkspaceSection?
+    private(set) var delegateCallCount = 0
 
     lazy var sectionControl: ScrollableTabBar<ContractWorkspaceSection> = {
         let control = ScrollableTabBar(
@@ -65,11 +63,7 @@ private final class ContractWorkspaceViewController: UIViewController {
             ],
             selectedID: selectedSection
         )
-        control.addTarget(
-            self,
-            action: #selector(sectionSelectionChanged),
-            for: .valueChanged
-        )
+        control.delegate = self
         return control
     }()
 
@@ -79,21 +73,16 @@ private final class ContractWorkspaceViewController: UIViewController {
         render(selectedSection)
     }
 
-    @objc private func sectionSelectionChanged() {
-        selectedSection = sectionControl.selectedID
-        render(selectedSection)
+    func scrollableTabBar(
+        _ tabBar: ScrollableTabBar<ContractWorkspaceSection>,
+        didSelect selectedID: ContractWorkspaceSection
+    ) {
+        delegateCallCount += 1
+        selectedSection = selectedID
+        render(selectedID)
     }
 
     private func render(_ section: ContractWorkspaceSection) {
         renderedSection = section
-    }
-}
-
-@MainActor
-private final class ContractSelectionRecorder: NSObject {
-    private(set) var eventCount = 0
-
-    @objc func valueChanged() {
-        eventCount += 1
     }
 }

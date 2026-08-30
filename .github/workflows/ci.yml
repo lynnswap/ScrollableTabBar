@@ -36,7 +36,6 @@ jobs:
           xcodebuild test \
             -workspace ScrollableTabBar.xcworkspace \
             -scheme ScrollableTabBarCI \
-            -testPlan ScrollableTabBarCI \
             -destination "${DESTINATION}" \
             -parallel-testing-enabled NO \
             -enableCodeCoverage NO \

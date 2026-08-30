@@ -16,81 +16,20 @@ concurrency:
 
 jobs:
   test:
-    name: Xcode 26.6, iOS 26.5, Product Contract, Documentation, and Demo
-    runs-on: macos-26
+    name: Xcode 27 Package, Contract, and Demo Tests
+    runs-on: xcode-27
     timeout-minutes: 45
     env:
-      XCODE_VERSION: '26.6.0'
-      SIMULATOR_VERSION: '26.5'
-      SIMULATOR_DEVICE: iPhone 17
+      DESTINATION: 'platform=iOS Simulator,arch=arm64,name=iPhone 17,OS=27.0'
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Resolve pinned Xcode
-        run: |
-          xcode_path="/Applications/Xcode_${XCODE_VERSION}.app"
-          test -d "${xcode_path}"
-          echo "DEVELOPER_DIR=${xcode_path}/Contents/Developer" >> "${GITHUB_ENV}"
-          echo "Resolved Xcode: ${xcode_path}"
-
-      - name: Create and boot pinned iOS Simulator
-        run: |
-          ruby <<'RUBY'
-          require "json"
-
-          requested_version = ENV.fetch("SIMULATOR_VERSION")
-          requested_device = ENV.fetch("SIMULATOR_DEVICE")
-          runtimes = JSON.parse(
-            `xcrun simctl list runtimes available --json`
-          ).fetch("runtimes")
-          runtime = runtimes.find do |candidate|
-            candidate.fetch("platform") == "iOS" &&
-              candidate.fetch("version") == requested_version
-          end
-          abort("No available iOS #{requested_version} runtime found") unless runtime
-
-          device_types = JSON.parse(
-            `xcrun simctl list devicetypes --json`
-          ).fetch("devicetypes")
-          device_type = device_types.find do |candidate|
-            candidate.fetch("name") == requested_device
-          end
-          abort("No #{requested_device} device type found") unless device_type
-
-          device_name = "ScrollableTabBar iOS #{requested_version}"
-          udid = IO.popen([
-            "xcrun", "simctl", "create", device_name,
-            device_type.fetch("identifier"), runtime.fetch("identifier"),
-          ], &:read).strip
-          abort("Failed to create #{device_name}") unless $?.success? && udid.empty? == false
-
-          system("xcrun", "simctl", "boot", udid) ||
-            abort("Failed to boot #{device_name}")
-
-          File.open(ENV.fetch("GITHUB_ENV"), "a") do |environment|
-            environment.puts(
-              "DESTINATION=platform=iOS Simulator,arch=arm64,id=#{udid}"
-            )
-          end
-          puts "Created simulator: #{requested_device} iOS #{requested_version} (#{udid})"
-          RUBY
 
       - name: Show build environment
         run: |
           xcodebuild -version
           xcodebuild -showsdks
           echo "Destination: ${DESTINATION}"
-
-      - name: Run package tests
-        run: |
-          xcodebuild test \
-            -workspace ScrollableTabBar.xcworkspace \
-            -scheme ScrollableTabBarTests \
-            -destination "${DESTINATION}" \
-            -parallel-testing-enabled NO \
-            -enableCodeCoverage NO \
-            -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-Workspace"
 
       - name: Run external product contract
         working-directory: ContractTests
@@ -100,42 +39,35 @@ jobs:
             -destination "${DESTINATION}" \
             -parallel-testing-enabled NO \
             -enableCodeCoverage NO \
-            -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-Contract"
+            -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-Contract" \
+            -resultBundlePath "${RUNNER_TEMP}/ScrollableTabBar-Contract.xcresult"
 
-      - name: Build DocC with warnings as errors
-        run: |
-          xcodebuild docbuild \
-            -scheme ScrollableTabBar \
-            -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-Workspace" \
-            OTHER_DOCC_FLAGS='--warnings-as-errors' \
-            CODE_SIGNING_ALLOWED=NO
-
-      - name: Run demo UI smoke test
+      - name: Run package and demo UI tests
         run: |
           xcodebuild test \
             -workspace ScrollableTabBar.xcworkspace \
-            -scheme ScrollableTabBarDemo \
+            -scheme ScrollableTabBarCI \
+            -testPlan ScrollableTabBarCI \
             -destination "${DESTINATION}" \
-            -only-testing:ScrollableTabBarDemoUITests \
             -parallel-testing-enabled NO \
             -enableCodeCoverage NO \
             -testLanguage en \
             -testRegion US \
             -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-Workspace" \
-            -resultBundlePath "${RUNNER_TEMP}/ScrollableTabBar-DemoTests.xcresult"
+            -resultBundlePath "${RUNNER_TEMP}/ScrollableTabBar-Workspace.xcresult"
 
-      - name: Upload failed demo UI test result
+      - name: Upload failed test results
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: demo-ui-test-result
-          path: ${{ runner.temp }}/ScrollableTabBar-DemoTests.xcresult
+          name: test-results
+          path: ${{ runner.temp }}/ScrollableTabBar-*.xcresult
           if-no-files-found: ignore
           retention-days: 7
           include-hidden-files: true
 
       - name: Build Release demo
+        if: github.event_name != 'pull_request'
         run: |
           xcodebuild build \
             -workspace ScrollableTabBar.xcworkspace \

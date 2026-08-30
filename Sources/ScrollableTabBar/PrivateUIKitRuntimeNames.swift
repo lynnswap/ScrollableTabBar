@@ -210,6 +210,24 @@ enum PrivateUIKitRuntimeNames {
             0xC2, 0xD0,
         ])
     )
+    // Original: filters
+    static let layerFiltersKey = decodedString([
+        0xC1, 0xCE, 0xCB, 0xD3, 0xC2, 0xD5, 0xD4,
+    ])
+    // Original: type
+    static let filterTypeKey = decodedString([
+        0xD3, 0xDE, 0xD7, 0xC2,
+    ])
+    // Original: variableBlur
+    static let variableBlurFilterType = decodedString([
+        0xD1, 0xC6, 0xD5, 0xCE, 0xC6, 0xC5, 0xCB, 0xC2, 0xE5,
+        0xCB, 0xD2, 0xD5,
+    ])
+    // Original: inputMaskImage
+    static let filterInputMaskImageKey = decodedString([
+        0xCE, 0xC9, 0xD7, 0xD2, 0xD3, 0xEA, 0xC6, 0xD4, 0xCC,
+        0xEE, 0xCA, 0xC6, 0xC0, 0xC2,
+    ])
     // Original: button
     static let pageButtonButtonSelector = NSSelectorFromString(
         decodedString([

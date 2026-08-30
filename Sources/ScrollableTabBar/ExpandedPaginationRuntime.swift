@@ -65,6 +65,8 @@ enum ExpandedPaginationRuntime {
         "ScrollableTabBarExpandedEdgeEffectView"
     private static let expandedEdgeCaptureViewClassName =
         "ScrollableTabBarExpandedEdgeCaptureView"
+    private static let legacyProgressiveEdgeMaskLayerName =
+        "ScrollableTabBarLegacyProgressiveEdgeMask"
     private static let expectedMaximumContainerSizeTypeEncoding =
         "{CGSize=dd}16@0:8"
     private static let expectedLayoutSubviewsTypeEncoding = "v16@0:8"
@@ -1217,6 +1219,210 @@ enum ExpandedPaginationRuntime {
         return true
     }
 
+    private static func applyLegacyProgressiveBlurMask(
+        in pocket: UIView,
+        edge: UIRectEdge
+    ) -> Bool {
+        if #available(iOS 27.0, *) {
+            return true
+        }
+        guard let blurView = firstVariableBlurView(in: pocket),
+              applyLegacyProgressiveBlurMask(
+                to: blurView,
+                edge: edge
+              ),
+              applyLegacyProgressiveEdgeMask(
+                to: pocket,
+                edge: edge
+              ) else {
+            return false
+        }
+        return true
+    }
+
+    private static func applyLegacyProgressiveBlurMask(
+        to blurView: UIView,
+        edge: UIRectEdge
+    ) -> Bool {
+        let maskKey = PrivateUIKitRuntimeNames.filterInputMaskImageKey
+        guard let variableBlur = variableBlurFilter(in: blurView),
+              blurView.bounds.width.isFinite,
+              blurView.bounds.height.isFinite else {
+            return false
+        }
+
+        let width = Int(blurView.bounds.width.rounded(.up))
+        let height = Int(blurView.bounds.height.rounded(.up))
+        guard width > 0, height > 0 else {
+            return false
+        }
+        if let currentMask = cgImage(
+            from: variableBlur.value(forKey: maskKey)
+        ),
+           currentMask.width == width,
+           currentMask.height == height {
+            return true
+        }
+        guard let mask = legacyProgressiveBlurMask(
+            width: width,
+            height: height,
+            edge: edge
+        ) else {
+            return false
+        }
+        variableBlur.setValue(mask, forKey: maskKey)
+        return cgImage(
+            from: variableBlur.value(forKey: maskKey)
+        ) != nil
+    }
+
+    private static func firstVariableBlurView(
+        in view: UIView
+    ) -> UIView? {
+        for subview in view.subviews {
+            if variableBlurFilter(in: subview) != nil {
+                return subview
+            }
+            if let match = firstVariableBlurView(in: subview) {
+                return match
+            }
+        }
+        return nil
+    }
+
+    private static func variableBlurFilter(
+        in view: UIView
+    ) -> NSObject? {
+        let filtersKey = PrivateUIKitRuntimeNames.layerFiltersKey
+        let typeKey = PrivateUIKitRuntimeNames.filterTypeKey
+        guard let filters = view.layer.value(
+            forKey: filtersKey
+        ) as? [NSObject] else {
+            return nil
+        }
+        return filters.first {
+            $0.value(forKey: typeKey) as? String
+                == PrivateUIKitRuntimeNames.variableBlurFilterType
+        }
+    }
+
+    private static func applyLegacyProgressiveEdgeMask(
+        to pocket: UIView,
+        edge: UIRectEdge
+    ) -> Bool {
+        let maskLayer: CAGradientLayer
+        if let currentMask = pocket.layer.mask {
+            guard currentMask.name == legacyProgressiveEdgeMaskLayerName,
+                  let currentGradient = currentMask as? CAGradientLayer else {
+                return false
+            }
+            maskLayer = currentGradient
+        } else {
+            maskLayer = CAGradientLayer()
+            maskLayer.name = legacyProgressiveEdgeMaskLayerName
+            pocket.layer.mask = maskLayer
+        }
+
+        let opaque = CGColor(gray: 1, alpha: 1)
+        let clear = CGColor(gray: 0, alpha: 0)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        maskLayer.frame = pocket.bounds
+        maskLayer.startPoint = CGPoint(x: 0, y: 0.5)
+        maskLayer.endPoint = CGPoint(x: 1, y: 0.5)
+        maskLayer.locations = [0, 0.5, 1]
+        maskLayer.colors = edge == .left
+            ? [opaque, clear, clear]
+            : [clear, clear, opaque]
+        CATransaction.commit()
+        return true
+    }
+
+    private static func cgImage(from value: Any?) -> CGImage? {
+        guard let value else {
+            return nil
+        }
+        let object = value as AnyObject
+        guard CFGetTypeID(object) == CGImage.typeID else {
+            return nil
+        }
+        return unsafe unsafeDowncast(object, to: CGImage.self)
+    }
+
+    private static func legacyProgressiveBlurMask(
+        width: Int,
+        height: Int,
+        edge: UIRectEdge
+    ) -> CGImage? {
+        let colorSpace = CGColorSpaceCreateDeviceGray()
+        guard let context = unsafe CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.none.rawValue
+        ) else {
+            return nil
+        }
+
+        // iOS 27's V8 pocket uses a 59-point nonlinear mask with a 1.5-point
+        // blur radius. iOS 26 exposes a 1-point variable blur with no mask, so
+        // these intensities are V8's sampled curve multiplied by 1.5. Keep the
+        // full pocket for a continuous edge, but compress both masks into the
+        // outer half where the arrow overlays scrolling content.
+        let v8ReferenceWidth: CGFloat = 59
+        let referenceProfile: [(position: CGFloat, intensity: CGFloat)] = [
+            (0, 255),
+            (5, 224),
+            (10, 189),
+            (15, 156),
+            (20, 124),
+            (25, 94),
+            (30, 69),
+            (35, 46),
+            (40, 28),
+            (45, 15),
+            (50, 6),
+            (55, 0),
+            (59, 0),
+        ]
+        let blurWidthFraction: CGFloat = 0.5
+        let locations: [CGFloat]
+        let intensities: [CGFloat]
+        if edge == .left {
+            locations = referenceProfile.map {
+                $0.position / v8ReferenceWidth * blurWidthFraction
+            } + [1]
+            intensities = referenceProfile.map(\.intensity) + [0]
+        } else {
+            locations = [0] + referenceProfile.map {
+                1 - blurWidthFraction
+                    + $0.position / v8ReferenceWidth * blurWidthFraction
+            }
+            intensities = [0]
+                + referenceProfile.reversed().map(\.intensity)
+        }
+        let colors = intensities.map {
+            CGColor(gray: $0 / 255, alpha: 1)
+        }
+        guard let gradient = unsafe CGGradient(
+            colorsSpace: colorSpace,
+            colors: colors as CFArray,
+            locations: locations
+        ) else {
+            return nil
+        }
+        context.drawLinearGradient(
+            gradient,
+            start: CGPoint(x: 0, y: 0),
+            end: CGPoint(x: width, y: 0),
+            options: []
+        )
+        return context.makeImage()
+    }
+
     private static func installAlignedEdgeEffectPocketClass(
         on pocket: UIView,
         edge: UIRectEdge
@@ -1307,6 +1513,52 @@ enum ExpandedPaginationRuntime {
             objc_disposeClassPair(subclass)
             return nil
         }
+
+        if #available(iOS 27.0, *) {
+            objc_registerClassPair(subclass)
+            return subclass
+        }
+
+        let layoutSelector = #selector(UIView.layoutSubviews)
+        guard let layoutMethod = unsafe verifiedMethod(
+            on: baseClass,
+            selector: layoutSelector,
+            typeEncoding: expectedLayoutSubviewsTypeEncoding
+        ) else {
+            unsafe imp_removeBlock(setFrameOverride)
+            objc_disposeClassPair(subclass)
+            return nil
+        }
+        let originalLayoutImplementation =
+            unsafe method_getImplementation(layoutMethod)
+        let layoutBlock: @convention(block) (AnyObject) -> Void = {
+            object in
+            let implementation = unsafe unsafeBitCast(
+                originalLayoutImplementation,
+                to: LayoutSubviewsImplementation.self
+            )
+            implementation(object, layoutSelector)
+            if let pocket = object as? UIView {
+                _ = applyLegacyProgressiveBlurMask(
+                    in: pocket,
+                    edge: edge
+                )
+            }
+        }
+        let layoutOverride = unsafe imp_implementationWithBlock(
+            layoutBlock
+        )
+        guard unsafe class_addMethod(
+            subclass,
+            layoutSelector,
+            layoutOverride,
+            method_getTypeEncoding(layoutMethod)
+        ) else {
+            unsafe imp_removeBlock(setFrameOverride)
+            unsafe imp_removeBlock(layoutOverride)
+            objc_disposeClassPair(subclass)
+            return nil
+        }
         objc_registerClassPair(subclass)
         return subclass
     }
@@ -1358,12 +1610,14 @@ enum ExpandedPaginationRuntime {
         }
 
         // The native collection viewport ends before its sibling page button.
-        // Do not adopt iOS 27's wider automatic field in this compact bar: one
-        // bar radius beyond the native arrow preserves the iOS 26 falloff
-        // without obscuring the adjacent item. UIKit still owns blur strength
-        // and vertical geometry while scrolling.
+        // Keep the legacy pocket tall and square so its internal layers are not
+        // clipped. The masks above independently constrain the visible effect.
         var frame = proposedFrame
-        frame.size.width = buttonFrame.width + proposedFrame.height / 2
+        if #available(iOS 27.0, *) {
+            frame.size.width = buttonFrame.width + proposedFrame.height / 2
+        } else {
+            frame.size.width = max(buttonFrame.width, proposedFrame.height)
+        }
         frame.origin.x = edge == .left
             ? buttonFrame.minX
             : buttonFrame.maxX - frame.width

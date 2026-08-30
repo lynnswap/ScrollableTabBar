@@ -2,28 +2,35 @@ import Testing
 import UIKit
 @testable import ScrollableTabBar
 
+private enum TabID: Hashable {
+    case headers
+    case preview
+    case cookies
+    case security
+}
+
+@MainActor
+private final class SelectionRecorder<ID: Hashable>: ScrollableTabBarDelegate {
+    private(set) var selections: [ID] = []
+    private(set) var controlSelections: [ID] = []
+
+    func scrollableTabBar(
+        _ tabBar: ScrollableTabBar<ID>,
+        didSelect selectedID: ID
+    ) {
+        selections.append(selectedID)
+        controlSelections.append(tabBar.selectedID)
+    }
+}
+
 @MainActor
 @Suite(.serialized)
 struct ScrollableTabBarTests {
-    private enum TabID: Hashable {
-        case headers
-        case preview
-        case cookies
-        case security
-    }
-
     @Test
-    func preservesMembershipAndProgrammaticSelectionWithoutAnEvent() {
+    func preservesMembershipAndProgrammaticSelectionWithoutADelegateCallback() {
         let control = makeControl(selectedID: .headers)
-        var observedSelections: [TabID] = []
-        control.addAction(
-            UIAction { [weak control] _ in
-                if let selectedID = control?.selectedID {
-                    observedSelections.append(selectedID)
-                }
-            },
-            for: .valueChanged
-        )
+        let recorder = SelectionRecorder<TabID>()
+        control.delegate = recorder
 
         #expect(control.items.map(\.id) == [.headers, .preview, .cookies, .security])
         #expect(control.items.map(\.title) == ["Headers", "Preview", "Cookies", "Security"])
@@ -33,65 +40,65 @@ struct ScrollableTabBarTests {
         control.selectedID = .cookies
 
         #expect(control.selectedID == .cookies)
-        #expect(observedSelections.isEmpty)
+        #expect(recorder.selections.isEmpty)
     }
 
     @Test
-    func userSelectionUpdatesBeforeOneValueChangedEvent() {
+    func userSelectionUpdatesBeforeOneDelegateCallback() {
         let control = makeControl(selectedID: .headers)
-        var observedSelections: [TabID] = []
-        control.addAction(
-            UIAction { [weak control] _ in
-                if let selectedID = control?.selectedID {
-                    observedSelections.append(selectedID)
-                }
-            },
-            for: .valueChanged
-        )
+        let recorder = SelectionRecorder<TabID>()
+        control.delegate = recorder
 
         control.didSelectItem(at: 3)
 
         #expect(control.selectedID == .security)
-        #expect(observedSelections == [.security])
+        #expect(recorder.selections == [.security])
+        #expect(recorder.controlSelections == [.security])
 
         control.didSelectItem(at: 3)
 
-        #expect(observedSelections == [.security])
+        #expect(recorder.selections == [.security])
     }
 
     @Test
     func disabledControlRejectsUserSelection() {
         let control = makeControl(selectedID: .preview)
-        var eventCount = 0
-        control.addAction(
-            UIAction { _ in
-                eventCount += 1
-            },
-            for: .valueChanged
-        )
+        let recorder = SelectionRecorder<TabID>()
+        control.delegate = recorder
         control.isEnabled = false
 
         control.didSelectItem(at: 2)
 
         #expect(control.selectedID == .preview)
-        #expect(eventCount == 0)
+        #expect(recorder.selections.isEmpty)
     }
 
     @Test
     func invalidContentSelectionRestoresTheCurrentProjection() {
         let control = makeControl(selectedID: .preview)
-        var eventCount = 0
-        control.addAction(
-            UIAction { _ in
-                eventCount += 1
-            },
-            for: .valueChanged
-        )
+        let recorder = SelectionRecorder<TabID>()
+        control.delegate = recorder
 
         control.didSelectItem(at: 99)
 
         #expect(control.selectedID == .preview)
-        #expect(eventCount == 0)
+        #expect(recorder.selections.isEmpty)
+    }
+
+    @Test
+    func doesNotRetainItsDelegate() {
+        let control = makeControl(selectedID: .headers)
+        weak var releasedDelegate: SelectionRecorder<TabID>?
+
+        do {
+            let recorder = SelectionRecorder<TabID>()
+            releasedDelegate = recorder
+            control.delegate = recorder
+            #expect(control.delegate != nil)
+        }
+
+        #expect(releasedDelegate == nil)
+        #expect(control.delegate == nil)
     }
 
     @Test

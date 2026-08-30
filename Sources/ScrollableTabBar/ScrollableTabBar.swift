@@ -30,10 +30,9 @@ struct ScrollableTabBarPresentationItem {
 /// The control uses UIKit's system floating-tab presentation when its runtime contract
 /// is available, and otherwise presents the same ordered selection through public UIKit
 /// controls. When measured, the control requests up to a 640-point preferred width and
-/// accepts narrower space from its container. Listen for user selection with
-/// `UIControl.Event.valueChanged`.
+/// accepts narrower space from its container. Use ``delegate`` to receive user selection.
 @MainActor
-public final class ScrollableTabBar<ID: Hashable>: UIControl {
+public final class ScrollableTabBar<ID: Hashable>: UIView {
     /// A tab presented by ``ScrollableTabBar``.
     public struct Item: Identifiable {
         /// The stable identity used for selection.
@@ -68,7 +67,7 @@ public final class ScrollableTabBar<ID: Hashable>: UIControl {
     /// The identifier of the selected item.
     ///
     /// Assigning this property updates the presentation without sending
-    /// `UIControl.Event.valueChanged`. The identifier must belong to ``items``.
+    /// a delegate callback. The identifier must belong to ``items``.
     public var selectedID: ID {
         get {
             items[selectedIndexStorage].id
@@ -82,8 +81,13 @@ public final class ScrollableTabBar<ID: Hashable>: UIControl {
         }
     }
 
+    /// The object notified when the user selects a different item.
+    ///
+    /// The tab bar does not retain its delegate.
+    public weak var delegate: (any ScrollableTabBarDelegate<ID>)?
+
     /// A Boolean value that determines whether the user can change the selection.
-    public override var isEnabled: Bool {
+    public var isEnabled = true {
         didSet {
             renderContent()
         }
@@ -215,7 +219,10 @@ public final class ScrollableTabBar<ID: Hashable>: UIControl {
         }
         selectedIndexStorage = selectedIndex
         renderContent()
-        sendActions(for: .valueChanged)
+        delegate?.scrollableTabBar(
+            self,
+            didSelect: items[selectedIndex].id
+        )
     }
 
     private func renderContent() {

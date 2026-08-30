@@ -13,18 +13,18 @@ changes.
 Construct ``ScrollableTabBar`` with a nonempty collection of unique IDs and an
 initial ``ScrollableTabBar/selectedID`` that belongs to that collection.
 Assigning another member ID updates the projection without sending
-`UIControl.Event.valueChanged`.
+a delegate callback.
 
 ## User Selection
 
 When a user chooses a different item, the control updates
-``ScrollableTabBar/selectedID`` first and then sends exactly one
-`UIControl.Event.valueChanged`. Read `selectedID` from the event handler,
-update application state, and render the corresponding content. Reselecting the
-current item does not send an event.
+``ScrollableTabBar/selectedID`` first and then calls
+``ScrollableTabBarDelegate/scrollableTabBar(_:didSelect:)`` exactly once with
+the selected domain ID. Update application state from that ID and render the
+corresponding content. Reselecting the current item does not call the delegate.
 
-Set the inherited `UIControl.isEnabled` property to `false` when user selection
-must be prevented. Programmatic state remains app-owned.
+Set ``ScrollableTabBar/isEnabled`` to `false` when user selection must be
+prevented. Programmatic state remains app-owned.
 
 ## Presentation Boundary
 

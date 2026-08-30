@@ -1,0 +1,74 @@
+name: Documentation
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - README.md
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build DocC
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-26
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Build DocC archive
+        env:
+          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+        run: |
+          set -euo pipefail
+
+          xcodebuild docbuild \
+            -scheme ScrollableTabBar \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-DocC" \
+            OTHER_DOCC_FLAGS='--warnings-as-errors' \
+            DOCC_HOSTING_BASE_PATH="${PAGES_BASE_PATH#/}" \
+            CODE_SIGNING_ALLOWED=NO
+
+          docc_archive="${RUNNER_TEMP}/ScrollableTabBar-DocC/Build/Products/Debug-iphonesimulator/ScrollableTabBar.doccarchive"
+          test -f "${docc_archive}/index.html"
+          test -f "${docc_archive}/documentation/scrollabletabbar/index.html"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: ${{ runner.temp }}/ScrollableTabBar-DocC/Build/Products/Debug-iphonesimulator/ScrollableTabBar.doccarchive
+
+  deploy:
+    name: Deploy DocC
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

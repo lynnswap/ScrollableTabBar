@@ -25,15 +25,3 @@ corresponding content. Reselecting the current item does not call the delegate.
 
 Set ``ScrollableTabBar/isEnabled`` to `false` when user selection must be
 prevented. Programmatic state remains app-owned.
-
-## Presentation Boundary
-
-The system floating presentation is an implementation preference, not a public
-layout contract. The number of visible items, continuous scrolling, arrow
-placement, pagination width, and exact visual treatment can vary with UIKit and
-the available width.
-
-If the undocumented runtime contract is unavailable or changes, the control
-uses a public segmented or menu presentation. The fallback preserves item
-order, typed selection, enablement, and event semantics; it does not promise an
-identical appearance.

@@ -1,9 +1,9 @@
 # ScrollableTabBar
 
 `ScrollableTabBar` is an iOS UIKit control for presenting an ordered selection
-whose overflow items remain horizontally reachable. It prefers UIKit's native
-floating-tab presentation and preserves the same typed selection contract when
-it must use a public UIKit fallback.
+whose overflow items remain horizontally reachable.
+
+![ScrollableTabBar showing horizontally scrolling tabs](Docs/Assets/scrollable-tab-bar-demo.gif)
 
 > [!WARNING]
 > The preferred floating presentation relies on undocumented UIKit APIs and
@@ -15,39 +15,6 @@ it must use a public UIKit fallback.
 - iOS 18.0+
 - Swift 6.3+
 - UIKit
-
-## Installation
-
-Add the package URL in Xcode's **Add Package Dependencies** sheet:
-
-```text
-https://github.com/lynnswap/ScrollableTabBar.git
-```
-
-For a package manifest, depend on the released package and add the
-`ScrollableTabBar` product to the app target:
-
-```swift
-dependencies: [
-    .package(
-        url: "https://github.com/lynnswap/ScrollableTabBar.git",
-        exact: "0.1.0"
-    ),
-],
-targets: [
-    .target(
-        name: "MyApp",
-        dependencies: [
-            .product(
-                name: "ScrollableTabBar",
-                package: "ScrollableTabBar"
-            ),
-        ]
-    ),
-]
-```
-
-Then import the module with `import ScrollableTabBar`.
 
 ## Ownership
 

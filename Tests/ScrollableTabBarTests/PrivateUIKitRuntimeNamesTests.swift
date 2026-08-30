@@ -163,6 +163,16 @@ struct PrivateUIKitRuntimeNamesTests {
         )
         #expect(
             NSStringFromSelector(
+                PrivateUIKitRuntimeNames.edgeEffectViewSelector
+            ) == "effectView"
+        )
+        #expect(
+            NSStringFromSelector(
+                PrivateUIKitRuntimeNames.edgeCaptureViewSelector
+            ) == "captureView"
+        )
+        #expect(
+            NSStringFromSelector(
                 PrivateUIKitRuntimeNames.pageButtonButtonSelector
             ) == "button"
         )

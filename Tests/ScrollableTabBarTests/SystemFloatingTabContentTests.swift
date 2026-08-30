@@ -116,6 +116,16 @@ struct SystemFloatingTabContentTests {
                     forKey: "_edgeEffectViewInteraction"
                 ) as? NSObject
             )
+            let effectView = try #require(
+                edgeEffectInteraction.value(
+                    forKey: "effectView"
+                ) as? UIView
+            )
+            let captureView = try #require(
+                edgeEffectInteraction.value(
+                    forKey: "captureView"
+                ) as? UIView
+            )
             let rightPocket = try #require(
                 edgeEffectInteraction.value(
                     forKey: "rightPocket"
@@ -135,6 +145,32 @@ struct SystemFloatingTabContentTests {
             let edgeTolerance = 1 / max(
                 content.floatingView.traitCollection.displayScale,
                 1
+            )
+            let effectFrame = effectView.convert(
+                effectView.bounds,
+                to: content.floatingView.floatingTabBar
+            )
+            let captureFrame = captureView.convert(
+                captureView.bounds,
+                to: content.floatingView.floatingTabBar
+            )
+            let floatingBounds =
+                content.floatingView.floatingTabBar.bounds
+            #expect(
+                abs(effectFrame.minX - floatingBounds.minX)
+                    <= edgeTolerance
+            )
+            #expect(
+                abs(effectFrame.maxX - floatingBounds.maxX)
+                    <= edgeTolerance
+            )
+            #expect(
+                abs(captureFrame.minX - floatingBounds.minX)
+                    <= edgeTolerance
+            )
+            #expect(
+                abs(captureFrame.maxX - floatingBounds.maxX)
+                    <= edgeTolerance
             )
             #expect(rightPocketFrame.width > rightButtonFrame.width)
             #expect(
@@ -291,6 +327,28 @@ struct SystemFloatingTabContentTests {
             #expect(content.tabItemsView.frame.minX >= -tolerance)
             #expect(content.tabItemsView.frame.maxX <= width + tolerance)
             #expect(content.tabItemsView.isPagingEnabled == false)
+            if #available(iOS 26.0, *) {
+                let interaction = try #require(
+                    content.tabItemsView.value(
+                        forKey: "_edgeEffectViewInteraction"
+                    ) as? NSObject
+                )
+                for key in ["effectView", "captureView"] {
+                    let edgeView = try #require(
+                        interaction.value(forKey: key) as? UIView
+                    )
+                    let edgeFrame = edgeView.convert(
+                        edgeView.bounds,
+                        to: content.floatingView.floatingTabBar
+                    )
+                    #expect(
+                        abs(edgeFrame.minX) <= tolerance
+                    )
+                    #expect(
+                        abs(edgeFrame.maxX - width) <= tolerance
+                    )
+                }
+            }
         }
 
         content.tabItemsView.setContentOffset(
@@ -594,6 +652,16 @@ struct SystemFloatingTabContentTests {
                     forKey: "_edgeEffectViewInteraction"
                 ) as? NSObject
             )
+            let effectView = try #require(
+                edgeEffectInteraction.value(
+                    forKey: "effectView"
+                ) as? UIView
+            )
+            let captureView = try #require(
+                edgeEffectInteraction.value(
+                    forKey: "captureView"
+                ) as? UIView
+            )
             let leftPocket = try #require(
                 edgeEffectInteraction.value(
                     forKey: "leftPocket"
@@ -614,6 +682,32 @@ struct SystemFloatingTabContentTests {
             let leftButtonFrame = leftButton.convert(
                 leftButton.bounds,
                 to: content.floatingView.floatingTabBar
+            )
+            let effectFrame = effectView.convert(
+                effectView.bounds,
+                to: content.floatingView.floatingTabBar
+            )
+            let captureFrame = captureView.convert(
+                captureView.bounds,
+                to: content.floatingView.floatingTabBar
+            )
+            let floatingBounds =
+                content.floatingView.floatingTabBar.bounds
+            #expect(
+                abs(effectFrame.minX - floatingBounds.minX)
+                    <= tolerance
+            )
+            #expect(
+                abs(effectFrame.maxX - floatingBounds.maxX)
+                    <= tolerance
+            )
+            #expect(
+                abs(captureFrame.minX - floatingBounds.minX)
+                    <= tolerance
+            )
+            #expect(
+                abs(captureFrame.maxX - floatingBounds.maxX)
+                    <= tolerance
             )
             #expect(leftPocketFrame.width > leftButtonFrame.width)
             #expect(

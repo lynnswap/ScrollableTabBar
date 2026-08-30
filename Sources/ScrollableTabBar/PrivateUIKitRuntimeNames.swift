@@ -196,6 +196,20 @@ enum PrivateUIKitRuntimeNames {
             0xC2, 0xD5, 0xC6, 0xC4, 0xD3, 0xCE, 0xC8, 0xC9,
         ])
     )
+    // Original: effectView
+    static let edgeEffectViewSelector = NSSelectorFromString(
+        decodedString([
+            0xC2, 0xC1, 0xC1, 0xC2, 0xC4, 0xD3, 0xF1, 0xCE, 0xC2,
+            0xD0,
+        ])
+    )
+    // Original: captureView
+    static let edgeCaptureViewSelector = NSSelectorFromString(
+        decodedString([
+            0xC4, 0xC6, 0xD7, 0xD3, 0xD2, 0xD5, 0xC2, 0xF1, 0xCE,
+            0xC2, 0xD0,
+        ])
+    )
     // Original: button
     static let pageButtonButtonSelector = NSSelectorFromString(
         decodedString([

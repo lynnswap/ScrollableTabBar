@@ -61,6 +61,10 @@ enum ExpandedPaginationRuntime {
         "ScrollableTabBarLeftAlignedEdgeEffectPocketView"
     private static let rightAlignedEdgeEffectPocketClassName =
         "ScrollableTabBarRightAlignedEdgeEffectPocketView"
+    private static let expandedEdgeEffectViewClassName =
+        "ScrollableTabBarExpandedEdgeEffectView"
+    private static let expandedEdgeCaptureViewClassName =
+        "ScrollableTabBarExpandedEdgeCaptureView"
     private static let expectedMaximumContainerSizeTypeEncoding =
         "{CGSize=dd}16@0:8"
     private static let expectedLayoutSubviewsTypeEncoding = "v16@0:8"
@@ -888,9 +892,11 @@ enum ExpandedPaginationRuntime {
         rightEdgeEffect.style = .soft
         synchronizeEdgeEffectVisibility(in: floatingTabBar)
         // This floating hierarchy does not request pockets from the public
-        // overlay interaction alone. Force their initial creation; the pocket
-        // subclass only reanchors UIKit's proposed field to its outside arrow.
-        guard forceEdgeEffectPockets(in: floatingTabBar),
+        // overlay interaction alone. Force initial creation, extend only the
+        // effect capture beneath the sibling arrows, and anchor each pocket to
+        // the corresponding physical edge.
+        guard installExpandedEdgeGeometry(in: floatingTabBar),
+              forceEdgeEffectPockets(in: floatingTabBar),
               updateEdgeEffects(in: floatingTabBar) else {
             return false
         }
@@ -952,20 +958,9 @@ enum ExpandedPaginationRuntime {
     private static func hasVerifiedEdgeEffectActivationContract(
         on collectionView: UICollectionView
     ) -> Bool {
-        let interactionSelector =
-            PrivateUIKitRuntimeNames.edgeEffectViewInteractionSelector
-        guard let interactionGetter = unsafe verifiedMethod(
-            on: type(of: collectionView),
-            selector: interactionSelector,
-            typeEncoding: expectedObjectGetterTypeEncoding
-        ),
-              let interaction = unsafe unsafeBitCast(
-                method_getImplementation(interactionGetter),
-                to: ObjectGetterImplementation.self
-              )(
-                collectionView,
-                interactionSelector
-              ) else {
+        guard let interaction = edgeEffectInteraction(
+            in: collectionView
+        ) else {
             return false
         }
         let interactionType: AnyClass = type(of: interaction)
@@ -978,27 +973,55 @@ enum ExpandedPaginationRuntime {
                 on: interactionType,
                 selector: PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector,
                 typeEncoding: expectedForceEdgeEffectPocketTypeEncoding
+              ) != nil,
+              unsafe verifiedMethod(
+                on: interactionType,
+                selector: PrivateUIKitRuntimeNames.edgeEffectViewSelector,
+                typeEncoding: expectedObjectGetterTypeEncoding
+              ) != nil,
+              unsafe verifiedMethod(
+                on: interactionType,
+                selector: PrivateUIKitRuntimeNames.edgeCaptureViewSelector,
+                typeEncoding: expectedObjectGetterTypeEncoding
               ) != nil else {
             return false
         }
         return true
     }
 
+    private static func edgeEffectInteraction(
+        in collectionView: UICollectionView
+    ) -> AnyObject? {
+        let selector =
+            PrivateUIKitRuntimeNames.edgeEffectViewInteractionSelector
+        guard let getter = unsafe verifiedMethod(
+            on: type(of: collectionView),
+            selector: selector,
+            typeEncoding: expectedObjectGetterTypeEncoding
+        ) else {
+            return nil
+        }
+        return unsafe unsafeBitCast(
+            method_getImplementation(getter),
+            to: ObjectGetterImplementation.self
+        )(
+            collectionView,
+            selector
+        )
+    }
+
     @discardableResult
     private static func updateEdgeEffects(
         in object: AnyObject
     ) -> Bool {
-        let interactionSelector =
-            PrivateUIKitRuntimeNames.edgeEffectViewInteractionSelector
         let updateSelector =
             PrivateUIKitRuntimeNames.edgeEffectUpdateSelector
         guard #available(iOS 26.0, *),
               let floatingTabBar = object as? UIView,
               let collectionView = collectionView(in: floatingTabBar),
-              collectionView.responds(to: interactionSelector),
-              let interaction = unsafe collectionView
-                .perform(interactionSelector)?
-                .takeUnretainedValue(),
+              let interaction = edgeEffectInteraction(
+                in: collectionView
+              ),
               interaction.responds(to: updateSelector) else {
             return false
         }
@@ -1007,20 +1030,169 @@ enum ExpandedPaginationRuntime {
         return true
     }
 
+    private static func installExpandedEdgeGeometry(
+        in object: AnyObject
+    ) -> Bool {
+        guard #available(iOS 26.0, *),
+              let floatingTabBar = object as? UIView,
+              let collectionView = collectionView(in: floatingTabBar),
+              let interaction = edgeEffectInteraction(
+                in: collectionView
+              ),
+              let effectView = view(
+                from: interaction,
+                selector: PrivateUIKitRuntimeNames.edgeEffectViewSelector
+              ),
+              let captureView = view(
+                from: interaction,
+                selector: PrivateUIKitRuntimeNames.edgeCaptureViewSelector
+              ),
+              effectView !== captureView else {
+            return false
+        }
+
+        return installExpandedEdgeGeometryClass(
+            on: effectView,
+            className: expandedEdgeEffectViewClassName
+        ) && installExpandedEdgeGeometryClass(
+            on: captureView,
+            className: expandedEdgeCaptureViewClassName
+        )
+    }
+
+    private static func installExpandedEdgeGeometryClass(
+        on view: UIView,
+        className: String
+    ) -> Bool {
+        guard let currentClass = object_getClass(view) else {
+            return false
+        }
+        if NSStringFromClass(currentClass) == className {
+            return true
+        }
+        guard let geometryClass = makeExpandedEdgeGeometryClass(
+            baseClass: currentClass,
+            className: className
+        ) else {
+            return false
+        }
+        let previousClass: AnyClass? = object_setClass(
+            view,
+            geometryClass
+        )
+        return previousClass === currentClass
+    }
+
+    private static func makeExpandedEdgeGeometryClass(
+        baseClass: AnyClass,
+        className: String
+    ) -> AnyClass? {
+        if let existingClass = NSClassFromString(className) {
+            guard class_getSuperclass(existingClass) === baseClass else {
+                scrollableTabBarLogger.fault(
+                    "The ScrollableTabBar edge geometry class has an unexpected superclass."
+                )
+                return nil
+            }
+            return existingClass
+        }
+
+        let setFrameSelector = #selector(setter: UIView.frame)
+        guard let setFrameMethod = unsafe verifiedMethod(
+            on: baseClass,
+            selector: setFrameSelector,
+            typeEncoding: expectedSetFrameTypeEncoding
+        ) else {
+            return nil
+        }
+        let originalSetFrameImplementation =
+            unsafe method_getImplementation(setFrameMethod)
+        let setFrameBlock:
+            @convention(block) (AnyObject, CGRect) -> Void = {
+                object,
+                proposedFrame in
+                let frame = if let view = object as? UIView {
+                    expandedEdgeGeometryFrame(
+                        proposedFrame,
+                        for: view
+                    ) ?? proposedFrame
+                } else {
+                    proposedFrame
+                }
+                let implementation = unsafe unsafeBitCast(
+                    originalSetFrameImplementation,
+                    to: SetFrameImplementation.self
+                )
+                implementation(object, setFrameSelector, frame)
+            }
+        let setFrameOverride = unsafe imp_implementationWithBlock(
+            setFrameBlock
+        )
+
+        guard let subclass = unsafe objc_allocateClassPair(
+            baseClass,
+            className,
+            0
+        ) else {
+            unsafe imp_removeBlock(setFrameOverride)
+            return nil
+        }
+        guard unsafe class_addMethod(
+            subclass,
+            setFrameSelector,
+            setFrameOverride,
+            method_getTypeEncoding(setFrameMethod)
+        ) else {
+            unsafe imp_removeBlock(setFrameOverride)
+            objc_disposeClassPair(subclass)
+            return nil
+        }
+        objc_registerClassPair(subclass)
+        return subclass
+    }
+
+    private static func expandedEdgeGeometryFrame(
+        _ proposedFrame: CGRect,
+        for view: UIView
+    ) -> CGRect? {
+        guard let container = view.superview,
+              let collectionView = ancestorCollectionView(of: view),
+              let floatingTabBar = floatingTabBar(
+                for: collectionView
+              ) else {
+            return nil
+        }
+
+        let floatingFrame = floatingTabBar.convert(
+            floatingTabBar.bounds,
+            to: container
+        )
+        guard floatingFrame.minX.isFinite,
+              floatingFrame.width.isFinite,
+              floatingFrame.width > 0 else {
+            return nil
+        }
+
+        // The page buttons are siblings outside the native collection frame.
+        // Extend only the effect capture beneath those overlays; expanding the
+        // collection itself changes item exposure, paging, and accessibility.
+        var frame = proposedFrame
+        frame.origin.x = floatingFrame.minX
+        frame.size.width = floatingFrame.width
+        return frame
+    }
+
     private static func forceEdgeEffectPockets(
         in object: AnyObject
     ) -> Bool {
-        let interactionSelector =
-            PrivateUIKitRuntimeNames.edgeEffectViewInteractionSelector
         let forceSelector =
             PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector
         guard #available(iOS 26.0, *),
               let floatingTabBar = object as? UIView,
               let collectionView = collectionView(in: floatingTabBar),
-              collectionView.responds(to: interactionSelector),
-              let interaction = unsafe collectionView
-                .perform(interactionSelector)?
-                .takeUnretainedValue(),
+              let interaction = edgeEffectInteraction(
+                in: collectionView
+              ),
               interaction.responds(to: forceSelector) else {
             return false
         }

@@ -79,11 +79,5 @@ state.
 ### Essentials
 
 - <doc:SelectionOwnership>
-- ``ScrollableTabBar/init(items:selectedID:)``
-- ``ScrollableTabBar/Item``
+- ``ScrollableTabBar/ScrollableTabBar``
 - ``ScrollableTabBarDelegate``
-
-### Reading State
-
-- ``ScrollableTabBar/items``
-- ``ScrollableTabBar/selectedID``

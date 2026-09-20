@@ -458,6 +458,53 @@ struct SystemFloatingTabContentTests {
         )
     }
 
+    @Test(arguments: [CGFloat(-40), CGFloat(40)])
+    func navigationTitleLayoutPreservesOverscrollWhenViewportMoves(
+        overscroll: CGFloat
+    ) throws {
+        let control = ScrollableTabBar(
+            items: ["Headers", "Preview", "Cookies", "Security"]
+                .enumerated().map { .init(id: $0.offset, title: $0.element) },
+            selectedID: 0
+        )
+        let content = try #require(control.content as? SystemFloatingTabContent)
+        let root = UIViewController()
+        root.navigationItem.backButtonDisplayMode = .minimal
+        let detail = UIViewController()
+        detail.navigationItem.titleView = control
+        detail.navigationItem.rightBarButtonItem = UIBarButtonItem(
+            systemItem: .done
+        )
+        let navigation = UINavigationController(rootViewController: root)
+        navigation.setViewControllers([root, detail], animated: false)
+        let window = showInWindow(navigation)
+        defer { window.isHidden = true }
+        control.layoutIfNeeded()
+        let collection = content.tabItemsView
+        let bar = content.floatingView.floatingTabBar
+        bar.layoutIfNeeded()
+
+        #expect(collection.contentSize.width > collection.bounds.width)
+        let edge = overscroll < 0
+            ? -collection.adjustedContentInset.left
+            : collection.contentSize.width - collection.bounds.width
+                + collection.adjustedContentInset.right
+        collection.contentOffset.x = edge + overscroll
+        let expectedOffset = collection.contentOffset
+        let tolerance = 1 / max(control.traitCollection.displayScale, 1)
+
+        // Page arrows move the viewport while a drag is beyond an edge.
+        // Repositioning it must not change the scroll position.
+        var proposedFrame = collection.frame
+        proposedFrame.origin.x += 3
+        collection.frame = proposedFrame
+        #expect(abs(collection.contentOffset.x - expectedOffset.x) <= tolerance)
+        #expect(abs(collection.frame.minX - proposedFrame.minX) <= tolerance)
+
+        collection.frame = proposedFrame
+        #expect(abs(collection.contentOffset.x - expectedOffset.x) <= tolerance)
+    }
+
     @Test
     func trailingDecelerationTargetsTheFinalPhysicalEdge() throws {
         let content = try #require(

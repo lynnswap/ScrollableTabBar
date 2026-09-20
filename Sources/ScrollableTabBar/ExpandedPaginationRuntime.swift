@@ -680,44 +680,16 @@ enum ExpandedPaginationRuntime {
                     return
                 }
 
-                // _UIFloatingTabBar proposes its paginated viewport during
-                // layout. Applying that transient width makes UIScrollView
-                // clamp an active rubber-band offset before a later layout
-                // pass can expand the viewport again. Preserve UIKit's origin,
-                // height, and any wider native stretch while owning the minimum
-                // expanded width at the frame-mutation boundary.
+                // Moving the viewport for page arrows through setFrame: clamps
+                // contentOffset even when its size is unchanged. Update center
+                // separately to preserve rubber-banding, while bounds still
+                // lets UIScrollView handle actual viewport size changes.
                 var frame = proposedFrame
                 frame.size.width = max(proposedFrame.width, viewportWidth)
-                let currentFrame = collectionView.frame
-                let tolerance = 1 / max(
-                    collectionView.traitCollection.displayScale,
-                    1
-                )
-                let hasEffectiveFrameChange =
-                    abs(frame.origin.x - currentFrame.origin.x) > tolerance
-                    || abs(frame.origin.y - currentFrame.origin.y) > tolerance
-                    || abs(frame.size.width - currentFrame.size.width) > tolerance
-                    || abs(frame.size.height - currentFrame.size.height) > tolerance
-                if !hasEffectiveFrameChange,
-                   collectionView.isTracking
-                    || collectionView.isDragging
-                    || collectionView.isDecelerating,
-                   let naturalRange = naturalHorizontalScrollRange(
-                       in: collectionView,
-                       viewportWidth: collectionView.bounds.width
-                   ),
-                   collectionView.contentOffset.x
-                    < naturalRange.lowerBound - tolerance
-                    || collectionView.contentOffset.x
-                        > naturalRange.upperBound + tolerance {
-                    // UIScrollView revalidates contentOffset in setFrame: even
-                    // when the effective frame is unchanged. During trailing
-                    // rubber-banding that turns a no-op layout pass into an
-                    // immediate clamp back to the physical maximum, including
-                    // while UIKit is animating the release spring.
-                    return
+                if collectionView.bounds.size != frame.size {
+                    collectionView.bounds.size = frame.size
                 }
-                implementation(object, setFrameSelector, frame)
+                collectionView.center = CGPoint(x: frame.midX, y: frame.midY)
             }
         let setFrameOverride = unsafe imp_implementationWithBlock(
             setFrameBlock

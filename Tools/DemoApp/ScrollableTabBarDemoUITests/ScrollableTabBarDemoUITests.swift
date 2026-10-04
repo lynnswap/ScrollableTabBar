@@ -93,6 +93,43 @@ final class ScrollableTabBarDemoUITests: XCTestCase {
     }
 
     @MainActor
+    func testUpdatesTabsAndSelectsAfterRefillingAnEmptyBar() throws {
+        let app = XCUIApplication()
+        app.launch()
+        let label = app.staticTexts["ScrollableTabBarDemo.SelectionLabel"]
+        XCTAssertTrue(label.waitForExistence(timeout: 5))
+        app.buttons["ScrollableTabBarDemo.RemoveTab"].tap()
+        assertSelection("Headers", in: label)
+        app.buttons["ScrollableTabBarDemo.AddTab"].tap()
+        assertSelection("Overview", in: label)
+        app.buttons["ScrollableTabBarDemo.ReverseTabs"].tap()
+        assertSelection("Overview", in: label)
+        app.buttons["ScrollableTabBarDemo.ClearSelection"].tap()
+        assertSelection("None", in: label)
+        let control = app.descendants(matching: .any)["ScrollableTabBarDemo.Control"].firstMatch
+        let visibleTab = try XCTUnwrap(
+            app.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "ScrollableTabBarDemo.Tab.")
+            )
+            .allElementsBoundByIndex.first { $0.isHittable && control.frame.contains($0.frame) }
+        )
+        let selectedTitle = visibleTab.label
+        visibleTab.tap()
+        assertSelection(selectedTitle, in: label)
+
+        app.buttons["ScrollableTabBarDemo.ClearTabs"].tap()
+        assertSelection("None", in: label)
+        app.buttons["ScrollableTabBarDemo.AddTab"].tap()
+        assertSelection("Overview", in: label)
+        app.buttons["ScrollableTabBarDemo.AddTab"].tap()
+        assertSelection("Headers", in: label)
+        let refilledOverview = app.buttons["ScrollableTabBarDemo.Tab.overview"].firstMatch
+        XCTAssertTrue(refilledOverview.waitForExistence(timeout: 5))
+        refilledOverview.tap()
+        assertSelection("Overview", in: label)
+    }
+
+    @MainActor
     private func assertSelection(
         _ title: String,
         in selectionLabel: XCUIElement,

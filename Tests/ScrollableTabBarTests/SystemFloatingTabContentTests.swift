@@ -471,6 +471,8 @@ struct SystemFloatingTabContentTests {
         let root = UIViewController()
         root.navigationItem.backButtonDisplayMode = .minimal
         let detail = UIViewController()
+        // Give legacy navigation bars an initial title-view size to fit.
+        control.sizeToFit()
         detail.navigationItem.titleView = control
         detail.navigationItem.rightBarButtonItem = UIBarButtonItem(
             systemItem: .done
@@ -484,6 +486,7 @@ struct SystemFloatingTabContentTests {
         let bar = content.floatingView.floatingTabBar
         bar.layoutIfNeeded()
 
+        try #require(collection.bounds.width > 0)
         #expect(collection.contentSize.width > collection.bounds.width)
         let edge = overscroll < 0
             ? -collection.adjustedContentInset.left
@@ -812,7 +815,7 @@ struct SystemFloatingTabContentTests {
     @Test
     func translatesDelegateSelectionAndDisabledState() throws {
         let content = try #require(makeContent())
-        var selectedIndices: [Int] = []
+        var selectedIndices: [AnyHashable] = []
         content.selectionHandler = { index in
             selectedIndices.append(index)
         }
@@ -858,11 +861,85 @@ struct SystemFloatingTabContentTests {
         let tabController = try #require(content?.tabController)
         #expect(floatingTabBar.value(forKey: "_tabModel") != nil)
 
+        let children = tabController.children
+        #expect(!children.isEmpty)
         content = nil
 
         #expect(floatingTabBar.value(forKey: "_tabModel") == nil)
         #expect(tabController.delegate == nil)
         #expect(tabController.tabs.isEmpty)
+        #expect(children.allSatisfy { $0.parent == nil })
+    }
+
+    @Test
+    func retainsTheTabControllerUntilItsFloatingViewIsReleased() {
+        weak var releasedController: UITabBarController?
+        autoreleasepool {
+            var content: SystemFloatingTabContent? = makeContent()
+            var retainedView: UIView? = content?.view
+            releasedController = content?.tabController
+            content = nil
+            #expect(releasedController != nil)
+            #expect(retainedView != nil)
+            retainedView = nil
+        }
+        #expect(releasedController == nil)
+    }
+
+    @Test
+    func updatesTabsInPlaceAndPreservesSurvivingIdentities() throws {
+        let content = try #require(makeContent())
+        let originals = content.tabs
+        let floatingView = content.floatingView
+        content.view.frame = CGRect(x: 0, y: 0, width: 314, height: 49)
+        let host = UIViewController()
+        host.view.addSubview(content.view)
+        let window = showInWindow(host)
+        defer { window.isHidden = true }
+
+        let items: [ScrollableTabBarPresentationItem] = [
+            .init(
+                id: 2, title: "Cookies Updated", image: UIImage(systemName: "lock"),
+                accessibilityIdentifier: "Updated.Cookies"),
+            .init(id: 4, title: "Timing", image: nil, accessibilityIdentifier: "Updated.Timing"),
+            .init(id: 0, title: "Headers", image: nil, accessibilityIdentifier: "Updated.Headers"),
+        ]
+        #expect(content.setItems(items, selectedIndex: 0))
+        content.render(
+            selectedIndex: 0, isEnabled: true, accessibilityLabel: "Mode",
+            accessibilityIdentifier: "Control")
+        window.layoutIfNeeded()
+        content.view.layoutIfNeeded()
+        #expect(content.floatingView === floatingView)
+        #expect(content.tabs[0] === originals[2])
+        #expect(content.tabs[2] === originals[0])
+        #expect(!originals.contains { $0 === content.tabs[1] })
+        #expect(content.tabs.map(\.title) == items.map(\.title))
+        #expect(content.tabs[0].image === items[0].image)
+        #expect(content.tabs[0].accessibilityIdentifier == "Updated.Cookies")
+        #expect(content.tabController.selectedTab === originals[2])
+        #expect(content.tabItemsView.numberOfItems(inSection: 0) == 3)
+        #expect(!content.tabItemsView.isPagingEnabled)
+    }
+
+    @Test
+    func detachesRemovedTabsFromTheirParentController() throws {
+        let content = try #require(makeContent())
+        let removedChild = try #require(content.tabs[0].viewController)
+        #expect(removedChild.parent === content.tabController)
+        #expect(content.setItems([
+            .init(id: 2, title: "Cookies", image: nil, accessibilityIdentifier: nil)
+        ], selectedIndex: 0))
+        #expect(removedChild.parent == nil)
+    }
+
+    @Test
+    func supportsNoSelectionWithExistingItems() throws {
+        let content = try #require(makeContent())
+        content.render(
+            selectedIndex: nil, isEnabled: true, accessibilityLabel: nil,
+            accessibilityIdentifier: nil)
+        #expect(content.tabController.selectedTab == nil)
     }
 
     private func makeContent(
@@ -876,6 +953,7 @@ struct SystemFloatingTabContentTests {
         SystemFloatingTabContent.makeIfAvailable(
             items: titles.enumerated().map { index, title in
                 .init(
+                    id: index,
                     title: title,
                     image: nil,
                     accessibilityIdentifier:

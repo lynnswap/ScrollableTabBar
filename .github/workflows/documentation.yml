@@ -44,7 +44,8 @@ jobs:
             -configuration Debug \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-DocC" \
-            OTHER_DOCC_FLAGS='--warnings-as-errors' \
+            'OTHER_DOCC_FLAGS=$(SCROLLABLE_TAB_BAR_DOCC_FLAGS_$(PRODUCT_MODULE_NAME))' \
+            SCROLLABLE_TAB_BAR_DOCC_FLAGS_ScrollableTabBar='--warnings-as-errors' \
             DOCC_HOSTING_BASE_PATH="${PAGES_BASE_PATH#/}" \
             CODE_SIGNING_ALLOWED=NO
 

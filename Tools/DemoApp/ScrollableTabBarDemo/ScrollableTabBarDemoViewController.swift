@@ -38,16 +38,9 @@ final class ScrollableTabBarDemoViewController: UIViewController,
         }
     }
 
-    private lazy var sectionControl = ScrollableTabBar(
-        items: Section.allCases.map { section in
-            .init(
-                id: section,
-                title: section.title,
-                accessibilityIdentifier: section.accessibilityIdentifier
-            )
-        },
-        selectedID: Section.overview
-    )
+    private var sections = Section.allCases
+    private var selectedSection: Section? = .overview
+    private lazy var sectionControl = ScrollableTabBar<Section>()
 
     private let selectionLabel = UILabel()
 
@@ -85,10 +78,60 @@ final class ScrollableTabBarDemoViewController: UIViewController,
         selectionLabel.adjustsFontForContentSizeCategory = true
         selectionLabel.accessibilityIdentifier = "ScrollableTabBarDemo.SelectionLabel"
 
+        let addButton = UIButton(
+            type: .system,
+            primaryAction: UIAction(title: "Add tab") { [weak self] _ in
+                guard let self,
+                    let section = Section.allCases.first(where: { !sections.contains($0) })
+                else { return }
+                sections.append(section)
+                selectedSection = section
+                updateTabs()
+            })
+        addButton.accessibilityIdentifier = "ScrollableTabBarDemo.AddTab"
+        let removeButton = UIButton(
+            type: .system,
+            primaryAction: UIAction(title: "Remove selected tab") { [weak self] _ in
+                guard let self, let selectedSection else { return }
+                sections.removeAll { $0 == selectedSection }
+                self.selectedSection = sections.first
+                updateTabs()
+            })
+        removeButton.accessibilityIdentifier = "ScrollableTabBarDemo.RemoveTab"
+        let clearButton = UIButton(
+            type: .system,
+            primaryAction: UIAction(title: "Remove all tabs") { [weak self] _ in
+                guard let self else { return }
+                sections.removeAll()
+                selectedSection = nil
+                updateTabs()
+            })
+        clearButton.accessibilityIdentifier = "ScrollableTabBarDemo.ClearTabs"
+        let reverseButton = UIButton(
+            type: .system,
+            primaryAction: UIAction(title: "Reverse tabs") { [weak self] _ in
+                guard let self else { return }
+                sections.reverse()
+                updateTabs()
+            })
+        reverseButton.accessibilityIdentifier = "ScrollableTabBarDemo.ReverseTabs"
+        let clearSelectionButton = UIButton(
+            type: .system,
+            primaryAction: UIAction(title: "Clear selection") { [weak self] _ in
+                guard let self else { return }
+                selectedSection = nil
+                updateTabs()
+            })
+        clearSelectionButton.accessibilityIdentifier = "ScrollableTabBarDemo.ClearSelection"
         let stackView = UIStackView(arrangedSubviews: [
             headingLabel,
             instructionsLabel,
             selectionLabel,
+            addButton,
+            removeButton,
+            reverseButton,
+            clearSelectionButton,
+            clearButton,
         ])
         stackView.axis = .vertical
         stackView.alignment = .leading
@@ -110,18 +153,31 @@ final class ScrollableTabBarDemoViewController: UIViewController,
             ),
         ])
 
-        renderSelection(sectionControl.selectedID)
+        updateTabs()
     }
 
     func scrollableTabBar(
         _ tabBar: ScrollableTabBar<Section>,
         didSelect selectedID: Section
     ) {
+        selectedSection = selectedID
         renderSelection(selectedID)
     }
 
-    private func renderSelection(_ selectedID: Section) {
-        let title = selectedID.title
+    private func updateTabs() {
+        let items = sections.map { section in
+            ScrollableTabBar<Section>.Item(
+                id: section,
+                title: section.title,
+                accessibilityIdentifier: section.accessibilityIdentifier
+            )
+        }
+        sectionControl.setItems(items, selectedID: selectedSection)
+        renderSelection(selectedSection)
+    }
+
+    private func renderSelection(_ selectedID: Section?) {
+        let title = selectedID?.title ?? "None"
         selectionLabel.text = "Selected: \(title)"
         selectionLabel.accessibilityValue = title
     }

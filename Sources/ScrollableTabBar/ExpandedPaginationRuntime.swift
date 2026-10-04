@@ -1,57 +1,11 @@
+import ABIBridge
 import ObjectiveC
 import UIKit
 
 @MainActor
 enum ExpandedPaginationRuntime {
-    private typealias MaximumContainerSizeImplementation =
-        @convention(c) (AnyObject, Selector) -> CGSize
-    private typealias LayoutSubviewsImplementation =
-        @convention(c) (AnyObject, Selector) -> Void
-    private typealias SetFrameImplementation =
-        @convention(c) (AnyObject, Selector, CGRect) -> Void
-    private typealias SetContentInsetImplementation =
-        @convention(c) (AnyObject, Selector, UIEdgeInsets) -> Void
-    private typealias ObjectGetterImplementation =
-        @convention(c) (AnyObject, Selector) -> AnyObject?
-    private typealias ForceEdgeEffectPocketImplementation =
-        @convention(c) (AnyObject, Selector, UInt) -> AnyObject?
-    private typealias PageViewportWidthImplementation =
-        @convention(c) (AnyObject, Selector, CGFloat) -> CGFloat
-    private typealias CurrentPageImplementation =
-        @convention(c) (AnyObject, Selector) -> CGFloat
-    private typealias BackgroundInsetsImplementation =
-        @convention(c) (AnyObject, Selector) -> UIEdgeInsets
-    private typealias UpdateItemContentAlphaImplementation =
-        @convention(c) (AnyObject, Selector, NSIndexPath) -> Void
-    private typealias GestureIndexPathImplementation =
-        @convention(c) (
-            AnyObject,
-            Selector,
-            UIGestureRecognizer
-        ) -> NSIndexPath?
-    private typealias ScrollViewWillEndDraggingImplementation =
-        @convention(c) (
-            AnyObject,
-            Selector,
-            UIScrollView,
-            CGPoint,
-            UnsafeMutablePointer<CGPoint>
-        ) -> Void
-    private typealias ContentOffsetForPageImplementation =
-        @convention(c) (AnyObject, Selector, Int) -> CGPoint
-    private typealias PageProgressForContentOffsetImplementation =
-        @convention(c) (
-            AnyObject,
-            Selector,
-            CGPoint,
-            Bool
-        ) -> CGFloat
-    private typealias EdgeEffectGeometryViewSetter =
-        @convention(c) (AnyObject, Selector, UIView?) -> Void
-    private typealias PageButtonContentOpacityImplementation =
-        @convention(c) (AnyObject, Selector) -> CGFloat
-    private typealias PageWidthImplementation =
-        @convention(c) (AnyObject, Selector) -> CGFloat
+    private typealias ContentOffsetImplementation = NativeObjCImplementation<CGPoint, Int>
+    private static var hooksByClass: [String: [NativeObjCMethodHook]] = [:]
 
     private static let expandedFloatingTabBarClassName =
         "ScrollableTabBarFullWidthPaginationFloatingTabBar"
@@ -67,36 +21,6 @@ enum ExpandedPaginationRuntime {
         "ScrollableTabBarExpandedEdgeCaptureView"
     private static let legacyProgressiveEdgeMaskLayerName =
         "ScrollableTabBarLegacyProgressiveEdgeMask"
-    private static let expectedMaximumContainerSizeTypeEncoding =
-        "{CGSize=dd}16@0:8"
-    private static let expectedLayoutSubviewsTypeEncoding = "v16@0:8"
-    private static let expectedSetFrameTypeEncoding =
-        "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16"
-    private static let expectedSetContentInsetTypeEncoding =
-        "v48@0:8{UIEdgeInsets=dddd}16"
-    private static let expectedPageViewportWidthTypeEncoding = "d24@0:8d16"
-    private static let expectedCurrentPageTypeEncoding = "d16@0:8"
-    private static let expectedBackgroundInsetsTypeEncoding =
-        "{UIEdgeInsets=dddd}16@0:8"
-    private static let expectedUpdateItemContentAlphaTypeEncoding =
-        "v24@0:8@16"
-    private static let expectedGestureIndexPathTypeEncoding =
-        "@24@0:8@16"
-    private static let expectedScrollViewWillEndDraggingTypeEncoding =
-        "v48@0:8@16{CGPoint=dd}24N^{CGPoint=dd}40"
-    private static let expectedContentOffsetForPageTypeEncoding =
-        "{CGPoint=dd}24@0:8q16"
-    private static let expectedPageProgressForContentOffsetTypeEncoding =
-        "d36@0:8{CGPoint=dd}16B32"
-    private static let expectedEdgeEffectGeometryViewSetterTypeEncoding =
-        "v24@0:8@16"
-    private static let expectedObjectGetterTypeEncoding = "@16@0:8"
-    private static let expectedForceEdgeEffectPocketTypeEncoding =
-        "@24@0:8Q16"
-    private static let expectedVoidMethodTypeEncoding = "v16@0:8"
-    private static let expectedPageButtonContentOpacityTypeEncoding =
-        "d16@0:8"
-    private static let expectedPageWidthTypeEncoding = "d16@0:8"
     // Match UIView's effective visibility boundary so the blur and hit region
     // disappear with the native arrow rather than its floating-point tail.
     private static let minimumVisiblePageButtonOpacity: CGFloat = 0.01
@@ -111,12 +35,13 @@ enum ExpandedPaginationRuntime {
         }
 
         let expandedTabBar = expandedClass.init(frame: .zero)
-        guard expandedTabBar.responds(
-            to: PrivateUIKitRuntimeNames.currentPlatformMetricsSelector
-        ),
-              let metrics = unsafe expandedTabBar
-                .perform(PrivateUIKitRuntimeNames.currentPlatformMetricsSelector)?
-                .takeUnretainedValue() else {
+        guard
+            let metrics = value(
+                in: expandedTabBar,
+                selector: PrivateUIKitRuntimeNames.currentPlatformMetricsSelector,
+                as: AnyObject.self
+            )
+        else {
             scrollableTabBarLogger.error(
                 "UIKit's floating tab metrics are unavailable; retaining the standard pagination width."
             )
@@ -168,12 +93,9 @@ enum ExpandedPaginationRuntime {
         }
 
         let layout = collectionView.collectionViewLayout
-        guard layout.responds(
-            to: PrivateUIKitRuntimeNames.floatingTabBarSelector
-        ),
-              let layoutOwner = unsafe layout
-                .perform(PrivateUIKitRuntimeNames.floatingTabBarSelector)?
-                .takeUnretainedValue() as? UIView,
+        guard
+            let layoutOwner = view(
+                from: layout, selector: PrivateUIKitRuntimeNames.floatingTabBarSelector),
               layoutOwner === floatingTabBar,
               let baseClass = object_getClass(collectionView),
               let expandedClass = makeExpandedCollectionViewClass(
@@ -222,559 +144,168 @@ enum ExpandedPaginationRuntime {
     }
 
     static func maximumContainerSize(of floatingTabBar: UIView) -> CGSize? {
-        let selector = PrivateUIKitRuntimeNames.maximumContainerSizeSelector
-        guard floatingTabBar.responds(to: selector) else {
-            return nil
-        }
-        let implementation = unsafe unsafeBitCast(
-            floatingTabBar.method(for: selector),
-            to: MaximumContainerSizeImplementation.self
-        )
-        return implementation(floatingTabBar, selector)
+        guard
+            let method = try? ABIRuntime.shared.object(floatingTabBar).method(
+                selector: PrivateUIKitRuntimeNames.maximumContainerSizeSelector,
+                as: (() -> CGSize).self
+            )
+        else { return nil }
+        return try? unsafe method.unsafeInvoke()
     }
 
-    private static func makeExpandedFloatingTabBarClass(
-        baseClass: UIView.Type
-    ) -> UIView.Type? {
-        if let existingClass = NSClassFromString(
-            expandedFloatingTabBarClassName
-        ) {
-            guard class_getSuperclass(existingClass) === baseClass else {
-                scrollableTabBarLogger.fault(
-                    "The ScrollableTabBar runtime class has an unexpected superclass."
-                )
-                return nil
-            }
-            return existingClass as? UIView.Type
-        }
-
-        let maximumSizeSelector =
-            PrivateUIKitRuntimeNames.maximumContainerSizeSelector
-        let layoutSelector = #selector(UIView.layoutSubviews)
-        let updateAlphaSelector =
-            PrivateUIKitRuntimeNames.updateItemContentAlphaSelector
-        let gestureIndexPathSelector =
-            PrivateUIKitRuntimeNames.gestureIndexPathSelector
-        let scrollViewWillEndDraggingSelector = #selector(
-            UIScrollViewDelegate.scrollViewWillEndDragging(
-                _:withVelocity:targetContentOffset:
-            )
-        )
-        guard let maximumSizeMethod = unsafe verifiedMethod(
-            on: baseClass,
-            selector: maximumSizeSelector,
-            typeEncoding: expectedMaximumContainerSizeTypeEncoding
-        ),
-              let layoutMethod = unsafe verifiedMethod(
-                on: baseClass,
-                selector: layoutSelector,
-                typeEncoding: expectedLayoutSubviewsTypeEncoding
-              ),
-              let updateAlphaMethod = unsafe verifiedMethod(
-                on: baseClass,
-                selector: updateAlphaSelector,
-                typeEncoding: expectedUpdateItemContentAlphaTypeEncoding
-              ),
-              let gestureIndexPathMethod = unsafe verifiedMethod(
-                on: baseClass,
-                selector: gestureIndexPathSelector,
-                typeEncoding: expectedGestureIndexPathTypeEncoding
-              ),
-              let scrollViewWillEndDraggingMethod = unsafe verifiedMethod(
-                on: baseClass,
-                selector: scrollViewWillEndDraggingSelector,
-                typeEncoding:
-                    expectedScrollViewWillEndDraggingTypeEncoding
-              ) else {
-            scrollableTabBarLogger.error(
-                "UIKit's floating-tab interaction contract changed; retaining the standard presentation."
-            )
-            return nil
-        }
-
-        let originalMaximumSizeImplementation =
-            unsafe method_getImplementation(maximumSizeMethod)
-        let maximumSizeBlock: @convention(block) (AnyObject) -> CGSize = {
-            object in
-            let implementation = unsafe unsafeBitCast(
-                originalMaximumSizeImplementation,
-                to: MaximumContainerSizeImplementation.self
-            )
-            let originalSize = implementation(object, maximumSizeSelector)
-            guard let view = object as? UIView,
-                  view.bounds.width.isFinite,
-                  view.bounds.width > 0,
-                  originalSize.height.isFinite,
-                  originalSize.height > 0 else {
-                return originalSize
-            }
-            return CGSize(
-                width: view.bounds.width,
-                height: originalSize.height
-            )
-        }
-        let maximumSizeOverride = unsafe imp_implementationWithBlock(
-            maximumSizeBlock
-        )
-
-        let originalLayoutImplementation =
-            unsafe method_getImplementation(layoutMethod)
-        let layoutBlock: @convention(block) (AnyObject) -> Void = { object in
-            let implementation = unsafe unsafeBitCast(
-                originalLayoutImplementation,
-                to: LayoutSubviewsImplementation.self
-            )
-            implementation(object, layoutSelector)
-            synchronizeEdgeEffectVisibility(in: object)
-        }
-        let layoutOverride = unsafe imp_implementationWithBlock(layoutBlock)
-
-        let originalUpdateAlphaImplementation =
-            unsafe method_getImplementation(updateAlphaMethod)
-        let updateAlphaBlock:
-            @convention(block) (AnyObject, NSIndexPath) -> Void = {
-                object,
-                indexPath in
-                let implementation = unsafe unsafeBitCast(
-                    originalUpdateAlphaImplementation,
-                    to: UpdateItemContentAlphaImplementation.self
-                )
-                implementation(object, updateAlphaSelector, indexPath)
-                if #available(iOS 26.0, *) {
-                    restoreItemContentAlpha(
-                        at: indexPath as IndexPath,
-                        in: object
-                    )
-                }
-            }
-        let updateAlphaOverride = unsafe imp_implementationWithBlock(
-            updateAlphaBlock
-        )
-
-        let originalGestureIndexPathImplementation =
-            unsafe method_getImplementation(gestureIndexPathMethod)
-        let gestureIndexPathBlock:
-            @convention(block) (
-                AnyObject,
-                UIGestureRecognizer
-            ) -> NSIndexPath? = {
-                object,
-                gestureRecognizer in
-                let implementation = unsafe unsafeBitCast(
-                    originalGestureIndexPathImplementation,
-                    to: GestureIndexPathImplementation.self
-                )
-                if let originalIndexPath = implementation(
-                    object,
-                    gestureIndexPathSelector,
-                    gestureRecognizer
-                ) {
-                    return originalIndexPath
-                }
-                guard let floatingTabBar = object as? UIView,
-                      let collectionView = collectionView(
-                        in: floatingTabBar
-                      ),
-                      let indexPath = visibleItemIndexPath(
-                        for: gestureRecognizer,
-                        in: collectionView,
-                        within: floatingTabBar
-                      ) else {
-                    return nil
-                }
-                return indexPath as NSIndexPath
-            }
-        let gestureIndexPathOverride = unsafe imp_implementationWithBlock(
-            gestureIndexPathBlock
-        )
-
-        let originalScrollViewWillEndDraggingImplementation =
-            unsafe method_getImplementation(
-                scrollViewWillEndDraggingMethod
-            )
-        let scrollViewWillEndDraggingBlock:
-            @convention(block) (
-                AnyObject,
-                UIScrollView,
-                CGPoint,
-                UnsafeMutablePointer<CGPoint>
-            ) -> Void = {
-                object,
-                scrollView,
-                velocity,
-                targetContentOffset in
-                let implementation = unsafe unsafeBitCast(
-                    originalScrollViewWillEndDraggingImplementation,
-                    to: ScrollViewWillEndDraggingImplementation.self
-                )
-                implementation(
-                    object,
-                    scrollViewWillEndDraggingSelector,
-                    scrollView,
-                    velocity,
-                    targetContentOffset
-                )
-                alignDecelerationTarget(
-                    targetContentOffset,
-                    for: scrollView,
-                    in: object
-                )
-            }
-        let scrollViewWillEndDraggingOverride = unsafe imp_implementationWithBlock(
-            scrollViewWillEndDraggingBlock
-        )
-
-        guard let subclass = unsafe objc_allocateClassPair(
-            baseClass,
-            expandedFloatingTabBarClassName,
-            0
-        ) else {
-            unsafe imp_removeBlock(maximumSizeOverride)
-            unsafe imp_removeBlock(layoutOverride)
-            unsafe imp_removeBlock(updateAlphaOverride)
-            unsafe imp_removeBlock(gestureIndexPathOverride)
-            unsafe imp_removeBlock(scrollViewWillEndDraggingOverride)
-            scrollableTabBarLogger.error(
-                "UIKit's floating-tab pagination subclass could not be allocated."
-            )
-            return nil
-        }
-        guard unsafe class_addMethod(
-            subclass,
-            maximumSizeSelector,
-            maximumSizeOverride,
-            method_getTypeEncoding(maximumSizeMethod)
-        ),
-              unsafe class_addMethod(
-                subclass,
-                layoutSelector,
-                layoutOverride,
-                method_getTypeEncoding(layoutMethod)
-              ),
-              unsafe class_addMethod(
-                subclass,
-                updateAlphaSelector,
-                updateAlphaOverride,
-                method_getTypeEncoding(updateAlphaMethod)
-              ),
-              unsafe class_addMethod(
-                subclass,
-                gestureIndexPathSelector,
-                gestureIndexPathOverride,
-                method_getTypeEncoding(gestureIndexPathMethod)
-              ),
-              unsafe class_addMethod(
-                subclass,
-                scrollViewWillEndDraggingSelector,
-                scrollViewWillEndDraggingOverride,
-                method_getTypeEncoding(scrollViewWillEndDraggingMethod)
-              ) else {
-            unsafe imp_removeBlock(maximumSizeOverride)
-            unsafe imp_removeBlock(layoutOverride)
-            unsafe imp_removeBlock(updateAlphaOverride)
-            unsafe imp_removeBlock(gestureIndexPathOverride)
-            unsafe imp_removeBlock(scrollViewWillEndDraggingOverride)
-            objc_disposeClassPair(subclass)
-            scrollableTabBarLogger.error(
-                "UIKit's floating-tab overrides could not be installed."
-            )
-            return nil
-        }
-        objc_registerClassPair(subclass)
-        return subclass as? UIView.Type
+    private static func makeExpandedFloatingTabBarClass(baseClass: UIView.Type) -> UIView.Type? {
+        makeSubclass(of: baseClass, named: expandedFloatingTabBarClassName) { subclass in
+            [
+                unsafe .mainActorMethod(
+                    on: subclass,
+                    selector: PrivateUIKitRuntimeNames.maximumContainerSizeSelector,
+                    as: (() -> CGSize).self,
+                    onFailure: reportHookFailure
+                ) { call in
+                    let originalSize = try call.proceed()
+                    guard let view = try call.receiver as? UIView,
+                        view.bounds.width.isFinite, view.bounds.width > 0,
+                        originalSize.height.isFinite, originalSize.height > 0
+                    else {
+                        return originalSize
+                    }
+                    return CGSize(width: view.bounds.width, height: originalSize.height)
+                },
+                unsafe .mainActorMethod(
+                    on: subclass, selector: #selector(UIView.layoutSubviews),
+                    as: (() -> Void).self, onFailure: reportHookFailure
+                ) { call in
+                    try call.proceed()
+                    synchronizeEdgeEffectVisibility(in: try call.receiver)
+                },
+                unsafe .mainActorMethod(
+                    on: subclass,
+                    selector: PrivateUIKitRuntimeNames.updateItemContentAlphaSelector,
+                    as: ((NSIndexPath) -> Void).self, onFailure: reportHookFailure
+                ) { call, indexPath in
+                    try call.proceed(indexPath)
+                    if #available(iOS 26.0, *) {
+                        restoreItemContentAlpha(at: indexPath as IndexPath, in: try call.receiver)
+                    }
+                },
+                unsafe .mainActorMethod(
+                    on: subclass,
+                    selector: PrivateUIKitRuntimeNames.gestureIndexPathSelector,
+                    as: ((UIGestureRecognizer) -> NSIndexPath?).self,
+                    onFailure: reportHookFailure
+                ) { call, gesture in
+                    if let original = try call.proceed(gesture) { return original }
+                    guard let floatingTabBar = try call.receiver as? UIView,
+                        let collectionView = collectionView(in: floatingTabBar),
+                        let indexPath = visibleItemIndexPath(
+                            for: gesture, in: collectionView, within: floatingTabBar)
+                    else {
+                        return nil
+                    }
+                    return indexPath as NSIndexPath
+                },
+                unsafe .mainActorMethod(
+                    on: subclass,
+                    selector: #selector(
+                        UIScrollViewDelegate.scrollViewWillEndDragging(
+                            _:withVelocity:targetContentOffset:)),
+                    as: ((UIScrollView, CGPoint, UnsafeMutablePointer<CGPoint>) -> Void).self,
+                    onFailure: reportHookFailure
+                ) { call, scrollView, velocity, target in
+                    try unsafe call.proceed(scrollView, velocity, target)
+                    unsafe alignDecelerationTarget(target, for: scrollView, in: try call.receiver)
+                },
+            ]
+        } as? UIView.Type
     }
 
-    private static func makeExpandedCollectionViewClass(
-        baseClass: AnyClass
-    ) -> AnyClass? {
-        if let existingClass = NSClassFromString(
-            expandedCollectionViewClassName
-        ) {
-            guard class_getSuperclass(existingClass) === baseClass else {
-                scrollableTabBarLogger.fault(
-                    "The ScrollableTabBar collection runtime class has an unexpected superclass."
-                )
-                return nil
-            }
-            return existingClass
-        }
-
-        let viewportWidthSelector =
-            PrivateUIKitRuntimeNames.pageViewportWidthSelector
-        let contentOffsetSelector =
-            PrivateUIKitRuntimeNames.contentOffsetForPageSelector
-        let pageProgressSelector =
-            PrivateUIKitRuntimeNames.pageProgressForContentOffsetSelector
-        let setFrameSelector = #selector(setter: UIView.frame)
-        let setContentInsetSelector = #selector(
-            setter: UIScrollView.contentInset
-        )
-        guard let viewportWidthMethod = unsafe verifiedMethod(
-            on: baseClass,
-            selector: viewportWidthSelector,
-            typeEncoding: expectedPageViewportWidthTypeEncoding
-        ),
-              let contentOffsetMethod = unsafe verifiedMethod(
-                on: baseClass,
-                selector: contentOffsetSelector,
-                typeEncoding: expectedContentOffsetForPageTypeEncoding
-              ),
-              let pageProgressMethod = unsafe verifiedMethod(
-                on: baseClass,
-                selector: pageProgressSelector,
-                typeEncoding: expectedPageProgressForContentOffsetTypeEncoding
-              ),
-              let setFrameMethod = unsafe verifiedMethod(
-                on: baseClass,
-                selector: setFrameSelector,
-                typeEncoding: expectedSetFrameTypeEncoding
-              ),
-              let setContentInsetMethod = unsafe verifiedMethod(
-                on: baseClass,
-                selector: setContentInsetSelector,
-                typeEncoding: expectedSetContentInsetTypeEncoding
-              ),
-              unsafe verifiedMethod(
-                on: baseClass,
-                selector: PrivateUIKitRuntimeNames.currentPageSelector,
-                typeEncoding: expectedCurrentPageTypeEncoding
-              ) != nil,
-              verifiedBackgroundInsetsMethod() else {
-            return nil
-        }
-
-        let originalViewportWidthImplementation =
-            unsafe method_getImplementation(viewportWidthMethod)
-        let viewportWidthBlock:
-            @convention(block) (AnyObject, CGFloat) -> CGFloat = {
-                object,
-                pageProgress in
-                let implementation = unsafe unsafeBitCast(
-                    originalViewportWidthImplementation,
-                    to: PageViewportWidthImplementation.self
-                )
-                let originalWidth = implementation(
-                    object,
-                    viewportWidthSelector,
-                    pageProgress
-                )
-                guard let collectionView = object as? UICollectionView,
-                      let expandedWidth = pageViewportWidth(
-                        for: collectionView,
-                        pageProgress: pageProgress
-                      ),
-                      expandedWidth >= originalWidth else {
-                    return originalWidth
-                }
-                return expandedWidth
-            }
-        let viewportWidthOverride = unsafe imp_implementationWithBlock(
-            viewportWidthBlock
-        )
-
-        let originalContentOffsetImplementation =
-            unsafe method_getImplementation(contentOffsetMethod)
-        let contentOffsetBlock:
-            @convention(block) (AnyObject, Int) -> CGPoint = {
-                object,
-                page in
-                let implementation = unsafe unsafeBitCast(
-                    originalContentOffsetImplementation,
-                    to: ContentOffsetForPageImplementation.self
-                )
-                let originalOffset = implementation(
-                    object,
-                    contentOffsetSelector,
-                    page
-                )
-                guard let collectionView = object as? UICollectionView else {
-                    return originalOffset
-                }
-                // Keep this mapping and pageProgressForContentOffset: as an
-                // inverse pair. Extending contentInset to preserve UIKit's
-                // original last target exposes that extension as empty content.
-                return clampedContentOffset(
-                    originalOffset,
-                    forPage: page,
-                    in: collectionView,
-                    originalContentOffsetImplementation:
-                        originalContentOffsetImplementation,
-                    contentOffsetSelector: contentOffsetSelector
-                )
-            }
-        let contentOffsetOverride = unsafe imp_implementationWithBlock(
-            contentOffsetBlock
-        )
-
-        let originalPageProgressImplementation =
-            unsafe method_getImplementation(pageProgressMethod)
-        let pageProgressBlock:
-            @convention(block) (
-                AnyObject,
-                CGPoint,
-                Bool
-            ) -> CGFloat = {
-                object,
-                contentOffset,
-                clamped in
-                guard let collectionView = object as? UICollectionView,
-                      let progress = unsafe pageProgress(
-                        for: contentOffset,
-                        in: collectionView,
-                        originalContentOffsetImplementation:
-                            originalContentOffsetImplementation,
-                        contentOffsetSelector: contentOffsetSelector,
-                        clamped: clamped
-                      ) else {
-                    let implementation = unsafe unsafeBitCast(
-                        originalPageProgressImplementation,
-                        to: PageProgressForContentOffsetImplementation.self
+    private static func makeExpandedCollectionViewClass(baseClass: AnyClass) -> AnyClass? {
+        makeSubclass(of: baseClass, named: expandedCollectionViewClassName) { subclass in
+            let originalContentOffset = try ABIRuntime.shared.objcImplementation(
+                on: baseClass, selector: PrivateUIKitRuntimeNames.contentOffsetForPageSelector,
+                as: ((Int) -> CGPoint).self
+            )
+            let currentPage = try ABIRuntime.shared.objcMethod(
+                on: baseClass, selector: PrivateUIKitRuntimeNames.currentPageSelector,
+                as: (() -> CGFloat).self
+            )
+            return [
+                unsafe .mainActorMethod(
+                    on: subclass, selector: PrivateUIKitRuntimeNames.pageViewportWidthSelector,
+                    as: ((CGFloat) -> CGFloat).self, onFailure: reportHookFailure
+                ) { call, progress in
+                    let originalWidth = try call.proceed(progress)
+                    guard let collectionView = try call.receiver as? UICollectionView,
+                        let width = pageViewportWidth(for: collectionView, pageProgress: progress),
+                        width >= originalWidth
+                    else { return originalWidth }
+                    return width
+                },
+                unsafe .mainActorMethod(
+                    on: subclass, selector: PrivateUIKitRuntimeNames.contentOffsetForPageSelector,
+                    as: ((Int) -> CGPoint).self, onFailure: reportHookFailure
+                ) { call, page in
+                    let originalOffset = try call.proceed(page)
+                    guard let collectionView = try call.receiver as? UICollectionView else {
+                        return originalOffset
+                    }
+                    // Keep this mapping and pageProgressForContentOffset: as an
+                    // inverse pair. Insets would expose empty scrollable content.
+                    return clampedContentOffset(
+                        originalOffset, forPage: page, in: collectionView,
+                        originalContentOffsetImplementation: originalContentOffset
                     )
-                    return implementation(
-                        object,
-                        pageProgressSelector,
-                        contentOffset,
-                        clamped
-                    )
-                }
-                return progress
-            }
-        let pageProgressOverride = unsafe imp_implementationWithBlock(
-            pageProgressBlock
-        )
-
-        let originalSetFrameImplementation = unsafe method_getImplementation(
-            setFrameMethod
-        )
-        let setFrameBlock:
-            @convention(block) (AnyObject, CGRect) -> Void = {
-                object,
-                proposedFrame in
-                let implementation = unsafe unsafeBitCast(
-                    originalSetFrameImplementation,
-                    to: SetFrameImplementation.self
-                )
-                guard let collectionView = object as? UICollectionView,
-                      collectionView.responds(
-                        to: PrivateUIKitRuntimeNames.currentPageSelector
-                      ) else {
-                    implementation(object, setFrameSelector, proposedFrame)
-                    return
-                }
-
-                let currentPage = unsafe unsafeBitCast(
-                    collectionView.method(
-                        for: PrivateUIKitRuntimeNames.currentPageSelector
-                    ),
-                    to: CurrentPageImplementation.self
-                )(
-                    collectionView,
-                    PrivateUIKitRuntimeNames.currentPageSelector
-                )
-                guard currentPage.isFinite,
-                      let viewportWidth = pageViewportWidth(
-                        for: collectionView,
-                        pageProgress: currentPage
-                      ) else {
-                    implementation(object, setFrameSelector, proposedFrame)
-                    return
-                }
-
-                // Moving the viewport for page arrows through setFrame: clamps
-                // contentOffset even when its size is unchanged. Update center
-                // separately to preserve rubber-banding, while bounds still
-                // lets UIScrollView handle actual viewport size changes.
-                var frame = proposedFrame
-                frame.size.width = max(proposedFrame.width, viewportWidth)
-                if collectionView.bounds.size != frame.size {
-                    collectionView.bounds.size = frame.size
-                }
-                collectionView.center = CGPoint(x: frame.midX, y: frame.midY)
-            }
-        let setFrameOverride = unsafe imp_implementationWithBlock(
-            setFrameBlock
-        )
-
-        let originalSetContentInsetImplementation =
-            unsafe method_getImplementation(setContentInsetMethod)
-        let setContentInsetBlock:
-            @convention(block) (AnyObject, UIEdgeInsets) -> Void = {
-                object,
-                proposedContentInset in
-                let implementation = unsafe unsafeBitCast(
-                    originalSetContentInsetImplementation,
-                    to: SetContentInsetImplementation.self
-                )
-                // The factory requires zero explicit content inset, while
-                // system safe-area adjustments remain in adjustedContentInset.
-                // Our page mapping owns the horizontal range, so any horizontal
-                // inset later proposed by the paginated layout would create a
-                // second range regardless of layout direction.
-                var contentInset = proposedContentInset
-                contentInset.left = 0
-                contentInset.right = 0
-                implementation(
-                    object,
-                    setContentInsetSelector,
-                    contentInset
-                )
-            }
-        let setContentInsetOverride = unsafe imp_implementationWithBlock(
-            setContentInsetBlock
-        )
-
-        guard let subclass = unsafe objc_allocateClassPair(
-            baseClass,
-            expandedCollectionViewClassName,
-            0
-        ) else {
-            unsafe imp_removeBlock(viewportWidthOverride)
-            unsafe imp_removeBlock(contentOffsetOverride)
-            unsafe imp_removeBlock(pageProgressOverride)
-            unsafe imp_removeBlock(setFrameOverride)
-            unsafe imp_removeBlock(setContentInsetOverride)
-            return nil
+                },
+                unsafe .mainActorMethod(
+                    on: subclass,
+                    selector: PrivateUIKitRuntimeNames.pageProgressForContentOffsetSelector,
+                    as: ((CGPoint, Bool) -> CGFloat).self, onFailure: reportHookFailure
+                ) { call, offset, clamped in
+                    guard let collectionView = try call.receiver as? UICollectionView,
+                        let progress = pageProgress(
+                            for: offset, in: collectionView,
+                            originalContentOffsetImplementation: originalContentOffset,
+                            clamped: clamped
+                        )
+                    else { return try call.proceed(offset, clamped) }
+                    return progress
+                },
+                unsafe .mainActorMethod(
+                    on: subclass, selector: #selector(setter: UIView.frame),
+                    as: ((CGRect) -> Void).self, onFailure: reportHookFailure
+                ) { call, proposedFrame in
+                    guard let collectionView = try call.receiver as? UICollectionView else {
+                        return try call.proceed(proposedFrame)
+                    }
+                    let progress = try unsafe currentPage.unsafeInvoke(on: collectionView)
+                    guard progress.isFinite,
+                        let viewportWidth = pageViewportWidth(
+                            for: collectionView, pageProgress: progress)
+                    else {
+                        return try call.proceed(proposedFrame)
+                    }
+                    // setFrame: clamps contentOffset even when only the origin
+                    // moves. Preserve rubber-banding by updating center separately.
+                    var frame = proposedFrame
+                    frame.size.width = max(proposedFrame.width, viewportWidth)
+                    if collectionView.bounds.size != frame.size {
+                        collectionView.bounds.size = frame.size
+                    }
+                    collectionView.center = CGPoint(x: frame.midX, y: frame.midY)
+                },
+                unsafe .mainActorMethod(
+                    on: subclass, selector: #selector(setter: UIScrollView.contentInset),
+                    as: ((UIEdgeInsets) -> Void).self, onFailure: reportHookFailure
+                ) { call, proposedInset in
+                    // The page mapping owns the horizontal range. System safe-area
+                    // adjustments remain in adjustedContentInset.
+                    var inset = proposedInset
+                    inset.left = 0
+                    inset.right = 0
+                    try call.proceed(inset)
+                },
+            ]
         }
-        guard unsafe class_addMethod(
-            subclass,
-            viewportWidthSelector,
-            viewportWidthOverride,
-            method_getTypeEncoding(viewportWidthMethod)
-        ),
-              unsafe class_addMethod(
-                subclass,
-                contentOffsetSelector,
-                contentOffsetOverride,
-                method_getTypeEncoding(contentOffsetMethod)
-              ),
-              unsafe class_addMethod(
-                subclass,
-                pageProgressSelector,
-                pageProgressOverride,
-                method_getTypeEncoding(pageProgressMethod)
-              ),
-              unsafe class_addMethod(
-                subclass,
-                setFrameSelector,
-                setFrameOverride,
-                method_getTypeEncoding(setFrameMethod)
-              ),
-              unsafe class_addMethod(
-                subclass,
-                setContentInsetSelector,
-                setContentInsetOverride,
-                method_getTypeEncoding(setContentInsetMethod)
-              ) else {
-            unsafe imp_removeBlock(viewportWidthOverride)
-            unsafe imp_removeBlock(contentOffsetOverride)
-            unsafe imp_removeBlock(pageProgressOverride)
-            unsafe imp_removeBlock(setFrameOverride)
-            unsafe imp_removeBlock(setContentInsetOverride)
-            objc_disposeClassPair(subclass)
-            return nil
-        }
-        objc_registerClassPair(subclass)
-        return subclass
     }
 
     @available(iOS 26.0, *)
@@ -782,86 +313,40 @@ enum ExpandedPaginationRuntime {
         on collectionView: UICollectionView,
         in floatingTabBar: UIView
     ) -> Bool {
-        guard let leftArrowButton = view(
-            from: floatingTabBar,
-            selector: PrivateUIKitRuntimeNames.leftArrowButtonSelector
-        ),
-              let rightArrowButton = view(
-                from: floatingTabBar,
-                selector: PrivateUIKitRuntimeNames.rightArrowButtonSelector
-              ),
-              unsafe verifiedMethod(
-                on: type(of: leftArrowButton),
-                selector:
-                    PrivateUIKitRuntimeNames.pageButtonContentOpacitySelector,
-                typeEncoding: expectedPageButtonContentOpacityTypeEncoding
-              ) != nil,
-              unsafe verifiedMethod(
-                on: type(of: rightArrowButton),
-                selector:
-                    PrivateUIKitRuntimeNames.pageButtonContentOpacitySelector,
-                typeEncoding: expectedPageButtonContentOpacityTypeEncoding
-              ) != nil,
-              unsafe verifiedMethod(
-                on: type(of: leftArrowButton),
-                selector: PrivateUIKitRuntimeNames.pageButtonButtonSelector,
-                typeEncoding: expectedObjectGetterTypeEncoding
-              ) != nil,
-              unsafe verifiedMethod(
-                on: type(of: rightArrowButton),
-                selector: PrivateUIKitRuntimeNames.pageButtonButtonSelector,
-                typeEncoding: expectedObjectGetterTypeEncoding
-              ) != nil else {
-            return false
-        }
-
-        configureEdgeElementContainer(
-            on: leftArrowButton,
-            edge: .left,
-            for: collectionView
-        )
-        configureEdgeElementContainer(
-            on: rightArrowButton,
-            edge: .right,
-            for: collectionView
-        )
+        guard
+            let leftArrowButton = view(
+                from: floatingTabBar, selector: PrivateUIKitRuntimeNames.leftArrowButtonSelector),
+            let rightArrowButton = view(
+                from: floatingTabBar, selector: PrivateUIKitRuntimeNames.rightArrowButtonSelector),
+            pageButtonContentOpacity(of: leftArrowButton) != nil,
+            pageButtonContentOpacity(of: rightArrowButton) != nil,
+            view(from: leftArrowButton, selector: PrivateUIKitRuntimeNames.pageButtonButtonSelector)
+                != nil,
+            view(
+                from: rightArrowButton, selector: PrivateUIKitRuntimeNames.pageButtonButtonSelector)
+                != nil,
+            hasVerifiedEdgeEffectActivationContract(on: collectionView)
+        else { return false }
 
         let leftEdgeEffect = collectionView.leftEdgeEffect
         let rightEdgeEffect = collectionView.rightEdgeEffect
-        let geometrySelector =
-            PrivateUIKitRuntimeNames.edgeEffectGeometryViewWriteSelector
-        guard let leftGeometryMethod = unsafe verifiedMethod(
-            on: type(of: leftEdgeEffect),
-            selector: geometrySelector,
-            typeEncoding: expectedEdgeEffectGeometryViewSetterTypeEncoding
-        ),
-              let rightGeometryMethod = unsafe verifiedMethod(
-                on: type(of: rightEdgeEffect),
-                selector: geometrySelector,
-                typeEncoding: expectedEdgeEffectGeometryViewSetterTypeEncoding
-              ),
-              hasVerifiedEdgeEffectActivationContract(
-                on: collectionView
-              ) else {
+        do {
+            let leftGeometry = try ABIRuntime.shared.object(leftEdgeEffect).method(
+                selector: PrivateUIKitRuntimeNames.edgeEffectGeometryViewWriteSelector,
+                as: ((UIView?) -> Void).self
+            )
+            let rightGeometry = try ABIRuntime.shared.object(rightEdgeEffect).method(
+                selector: PrivateUIKitRuntimeNames.edgeEffectGeometryViewWriteSelector,
+                as: ((UIView?) -> Void).self
+            )
+            try unsafe leftGeometry.unsafeInvoke(leftArrowButton)
+            try unsafe rightGeometry.unsafeInvoke(rightArrowButton)
+        } catch {
+            scrollableTabBarLogger.error("UIKit's edge geometry is unavailable: \(error)")
             return false
         }
-
-        unsafe unsafeBitCast(
-            method_getImplementation(leftGeometryMethod),
-            to: EdgeEffectGeometryViewSetter.self
-        )(
-            leftEdgeEffect,
-            geometrySelector,
-            leftArrowButton
-        )
-        unsafe unsafeBitCast(
-            method_getImplementation(rightGeometryMethod),
-            to: EdgeEffectGeometryViewSetter.self
-        )(
-            rightEdgeEffect,
-            geometrySelector,
-            rightArrowButton
-        )
+        configureEdgeElementContainer(on: leftArrowButton, edge: .left, for: collectionView)
+        configureEdgeElementContainer(on: rightArrowButton, edge: .right, for: collectionView)
         leftEdgeEffect.style = .soft
         rightEdgeEffect.style = .soft
         synchronizeEdgeEffectVisibility(in: floatingTabBar)
@@ -869,12 +354,9 @@ enum ExpandedPaginationRuntime {
         // overlay interaction alone. Force initial creation, extend only the
         // effect capture beneath the sibling arrows, and anchor each pocket to
         // the corresponding physical edge.
-        guard installExpandedEdgeGeometry(in: floatingTabBar),
-              forceEdgeEffectPockets(in: floatingTabBar),
-              updateEdgeEffects(in: floatingTabBar) else {
-            return false
-        }
-        return true
+        return installExpandedEdgeGeometry(in: floatingTabBar)
+            && forceEdgeEffectPockets(in: floatingTabBar)
+            && updateEdgeEffects(in: floatingTabBar)
     }
 
     @available(iOS 26.0, *)
@@ -929,79 +411,49 @@ enum ExpandedPaginationRuntime {
             rightOpacity <= minimumVisiblePageButtonOpacity
     }
 
-    private static func hasVerifiedEdgeEffectActivationContract(
-        on collectionView: UICollectionView
-    ) -> Bool {
-        guard let interaction = edgeEffectInteraction(
-            in: collectionView
-        ) else {
-            return false
-        }
-        let interactionType: AnyClass = type(of: interaction)
-        guard unsafe verifiedMethod(
-            on: interactionType,
-            selector: PrivateUIKitRuntimeNames.edgeEffectUpdateSelector,
-            typeEncoding: expectedVoidMethodTypeEncoding
-        ) != nil,
-              unsafe verifiedMethod(
-                on: interactionType,
-                selector: PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector,
-                typeEncoding: expectedForceEdgeEffectPocketTypeEncoding
-              ) != nil,
-              unsafe verifiedMethod(
-                on: interactionType,
-                selector: PrivateUIKitRuntimeNames.edgeEffectViewSelector,
-                typeEncoding: expectedObjectGetterTypeEncoding
-              ) != nil,
-              unsafe verifiedMethod(
-                on: interactionType,
-                selector: PrivateUIKitRuntimeNames.edgeCaptureViewSelector,
-                typeEncoding: expectedObjectGetterTypeEncoding
-              ) != nil else {
-            return false
-        }
-        return true
+    private static func hasVerifiedEdgeEffectActivationContract(on collectionView: UICollectionView)
+        -> Bool
+    {
+        guard let interaction = edgeEffectInteraction(in: collectionView) else { return false }
+        do {
+            let type: AnyClass = type(of: interaction)
+            _ = try ABIRuntime.shared.objcMethod(
+                on: type, selector: PrivateUIKitRuntimeNames.edgeEffectUpdateSelector,
+                as: (() -> Void).self
+            )
+            _ = try ABIRuntime.shared.objcMethod(
+                on: type, selector: PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector,
+                as: ((UInt) -> UIView?).self
+            )
+            _ = try ABIRuntime.shared.objcMethod(
+                on: type, selector: PrivateUIKitRuntimeNames.edgeEffectViewSelector,
+                as: (() -> UIView?).self
+            )
+            _ = try ABIRuntime.shared.objcMethod(
+                on: type, selector: PrivateUIKitRuntimeNames.edgeCaptureViewSelector,
+                as: (() -> UIView?).self
+            )
+            return true
+        } catch { return false }
     }
 
-    private static func edgeEffectInteraction(
-        in collectionView: UICollectionView
-    ) -> AnyObject? {
-        let selector =
-            PrivateUIKitRuntimeNames.edgeEffectViewInteractionSelector
-        guard let getter = unsafe verifiedMethod(
-            on: type(of: collectionView),
-            selector: selector,
-            typeEncoding: expectedObjectGetterTypeEncoding
-        ) else {
-            return nil
-        }
-        return unsafe unsafeBitCast(
-            method_getImplementation(getter),
-            to: ObjectGetterImplementation.self
-        )(
-            collectionView,
-            selector
+    private static func edgeEffectInteraction(in collectionView: UICollectionView) -> AnyObject? {
+        value(
+            in: collectionView,
+            selector: PrivateUIKitRuntimeNames.edgeEffectViewInteractionSelector, as: AnyObject.self
         )
     }
 
     @discardableResult
-    private static func updateEdgeEffects(
-        in object: AnyObject
-    ) -> Bool {
-        let updateSelector =
-            PrivateUIKitRuntimeNames.edgeEffectUpdateSelector
+    private static func updateEdgeEffects(in object: AnyObject) -> Bool {
         guard #available(iOS 26.0, *),
               let floatingTabBar = object as? UIView,
               let collectionView = collectionView(in: floatingTabBar),
-              let interaction = edgeEffectInteraction(
-                in: collectionView
-              ),
-              interaction.responds(to: updateSelector) else {
-            return false
-        }
-
-        _ = unsafe interaction.perform(updateSelector)
-        return true
+            let interaction = edgeEffectInteraction(in: collectionView)
+        else { return false }
+        return value(
+            in: interaction, selector: PrivateUIKitRuntimeNames.edgeEffectUpdateSelector,
+            as: Void.self) != nil
     }
 
     private static func installExpandedEdgeGeometry(
@@ -1057,72 +509,23 @@ enum ExpandedPaginationRuntime {
         return previousClass === currentClass
     }
 
-    private static func makeExpandedEdgeGeometryClass(
-        baseClass: AnyClass,
-        className: String
-    ) -> AnyClass? {
-        if let existingClass = NSClassFromString(className) {
-            guard class_getSuperclass(existingClass) === baseClass else {
-                scrollableTabBarLogger.fault(
-                    "The ScrollableTabBar edge geometry class has an unexpected superclass."
-                )
-                return nil
-            }
-            return existingClass
-        }
-
-        let setFrameSelector = #selector(setter: UIView.frame)
-        guard let setFrameMethod = unsafe verifiedMethod(
-            on: baseClass,
-            selector: setFrameSelector,
-            typeEncoding: expectedSetFrameTypeEncoding
-        ) else {
-            return nil
-        }
-        let originalSetFrameImplementation =
-            unsafe method_getImplementation(setFrameMethod)
-        let setFrameBlock:
-            @convention(block) (AnyObject, CGRect) -> Void = {
-                object,
-                proposedFrame in
-                let frame = if let view = object as? UIView {
-                    expandedEdgeGeometryFrame(
-                        proposedFrame,
-                        for: view
-                    ) ?? proposedFrame
-                } else {
-                    proposedFrame
+    private static func makeExpandedEdgeGeometryClass(baseClass: AnyClass, className: String)
+        -> AnyClass?
+    {
+        makeSubclass(of: baseClass, named: className) { subclass in
+            [
+                unsafe .mainActorMethod(
+                    on: subclass, selector: #selector(setter: UIView.frame),
+                    as: ((CGRect) -> Void).self, onFailure: reportHookFailure
+                ) { call, proposedFrame in
+                    let frame =
+                        if let view = try call.receiver as? UIView {
+                            expandedEdgeGeometryFrame(proposedFrame, for: view) ?? proposedFrame
+                        } else { proposedFrame }
+                    try call.proceed(frame)
                 }
-                let implementation = unsafe unsafeBitCast(
-                    originalSetFrameImplementation,
-                    to: SetFrameImplementation.self
-                )
-                implementation(object, setFrameSelector, frame)
-            }
-        let setFrameOverride = unsafe imp_implementationWithBlock(
-            setFrameBlock
-        )
-
-        guard let subclass = unsafe objc_allocateClassPair(
-            baseClass,
-            className,
-            0
-        ) else {
-            unsafe imp_removeBlock(setFrameOverride)
-            return nil
+            ]
         }
-        guard unsafe class_addMethod(
-            subclass,
-            setFrameSelector,
-            setFrameOverride,
-            method_getTypeEncoding(setFrameMethod)
-        ) else {
-            unsafe imp_removeBlock(setFrameOverride)
-            objc_disposeClassPair(subclass)
-            return nil
-        }
-        objc_registerClassPair(subclass)
-        return subclass
     }
 
     private static func expandedEdgeGeometryFrame(
@@ -1156,37 +559,20 @@ enum ExpandedPaginationRuntime {
         return frame
     }
 
-    private static func forceEdgeEffectPockets(
-        in object: AnyObject
-    ) -> Bool {
-        let forceSelector =
-            PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector
+    private static func forceEdgeEffectPockets(in object: AnyObject) -> Bool {
         guard #available(iOS 26.0, *),
               let floatingTabBar = object as? UIView,
               let collectionView = collectionView(in: floatingTabBar),
-              let interaction = edgeEffectInteraction(
-                in: collectionView
-              ),
-              interaction.responds(to: forceSelector) else {
-            return false
-        }
-
-        let implementation = unsafe unsafeBitCast(
-            interaction.method(for: forceSelector),
-            to: ForceEdgeEffectPocketImplementation.self
-        )
+            let interaction = edgeEffectInteraction(in: collectionView),
+            let forcePocket = try? ABIRuntime.shared.object(interaction).method(
+                selector: PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector,
+                as: ((UInt) -> UIView?).self
+            )
+        else { return false }
         for edge: UIRectEdge in [.left, .right] {
-            guard let pocket = implementation(
-                interaction,
-                forceSelector,
-                edge.rawValue
-            ) as? UIView,
-                  installAlignedEdgeEffectPocketClass(
-                    on: pocket,
-                    edge: edge
-                  ) else {
-                return false
-            }
+            guard let pocket = try? unsafe forcePocket.unsafeInvoke(edge.rawValue),
+                installAlignedEdgeEffectPocketClass(on: pocket, edge: edge)
+            else { return false }
         }
         return true
     }
@@ -1419,120 +805,38 @@ enum ExpandedPaginationRuntime {
         return previousClass === currentClass
     }
 
-    private static func makeAlignedEdgeEffectPocketClass(
-        baseClass: AnyClass,
-        edge: UIRectEdge
-    ) -> AnyClass? {
-        let className = alignedEdgeEffectPocketClassName(for: edge)
-        if let existingClass = NSClassFromString(className) {
-            guard class_getSuperclass(existingClass) === baseClass else {
-                scrollableTabBarLogger.fault(
-                    "The ScrollableTabBar edge-effect pocket class has an unexpected superclass."
-                )
-                return nil
-            }
-            return existingClass
-        }
-
-        let setFrameSelector = #selector(setter: UIView.frame)
-        guard let setFrameMethod = unsafe verifiedMethod(
-            on: baseClass,
-            selector: setFrameSelector,
-            typeEncoding: expectedSetFrameTypeEncoding
-        ) else {
-            return nil
-        }
-        let originalSetFrameImplementation =
-            unsafe method_getImplementation(setFrameMethod)
-        let setFrameBlock:
-            @convention(block) (AnyObject, CGRect) -> Void = {
-                object,
-                proposedFrame in
-                let frame = if let pocket = object as? UIView {
-                    alignedEdgeEffectPocketFrame(
-                        proposedFrame,
-                        for: pocket,
-                        edge: edge
-                    ) ?? proposedFrame
-                } else {
-                    proposedFrame
+    private static func makeAlignedEdgeEffectPocketClass(baseClass: AnyClass, edge: UIRectEdge)
+        -> AnyClass?
+    {
+        makeSubclass(of: baseClass, named: alignedEdgeEffectPocketClassName(for: edge)) {
+            subclass in
+            var requests = [
+                unsafe NativeObjCHookRequest.mainActorMethod(
+                    on: subclass, selector: #selector(setter: UIView.frame),
+                    as: ((CGRect) -> Void).self, onFailure: reportHookFailure
+                ) { call, proposedFrame in
+                    let frame =
+                        if let pocket = try call.receiver as? UIView {
+                            alignedEdgeEffectPocketFrame(proposedFrame, for: pocket, edge: edge)
+                                ?? proposedFrame
+                        } else { proposedFrame }
+                    try call.proceed(frame)
                 }
-                let implementation = unsafe unsafeBitCast(
-                    originalSetFrameImplementation,
-                    to: SetFrameImplementation.self
-                )
-                implementation(object, setFrameSelector, frame)
+            ]
+            if #unavailable(iOS 27.0) {
+                requests.append(
+                    unsafe .mainActorMethod(
+                        on: subclass, selector: #selector(UIView.layoutSubviews),
+                        as: (() -> Void).self, onFailure: reportHookFailure
+                    ) { call in
+                        try call.proceed()
+                        if let pocket = try call.receiver as? UIView {
+                            _ = applyLegacyProgressiveBlurMask(in: pocket, edge: edge)
+                        }
+                    })
             }
-        let setFrameOverride = unsafe imp_implementationWithBlock(
-            setFrameBlock
-        )
-
-        guard let subclass = unsafe objc_allocateClassPair(
-            baseClass,
-            className,
-            0
-        ) else {
-            unsafe imp_removeBlock(setFrameOverride)
-            return nil
+            return requests
         }
-        guard unsafe class_addMethod(
-            subclass,
-            setFrameSelector,
-            setFrameOverride,
-            method_getTypeEncoding(setFrameMethod)
-        ) else {
-            unsafe imp_removeBlock(setFrameOverride)
-            objc_disposeClassPair(subclass)
-            return nil
-        }
-
-        if #available(iOS 27.0, *) {
-            objc_registerClassPair(subclass)
-            return subclass
-        }
-
-        let layoutSelector = #selector(UIView.layoutSubviews)
-        guard let layoutMethod = unsafe verifiedMethod(
-            on: baseClass,
-            selector: layoutSelector,
-            typeEncoding: expectedLayoutSubviewsTypeEncoding
-        ) else {
-            unsafe imp_removeBlock(setFrameOverride)
-            objc_disposeClassPair(subclass)
-            return nil
-        }
-        let originalLayoutImplementation =
-            unsafe method_getImplementation(layoutMethod)
-        let layoutBlock: @convention(block) (AnyObject) -> Void = {
-            object in
-            let implementation = unsafe unsafeBitCast(
-                originalLayoutImplementation,
-                to: LayoutSubviewsImplementation.self
-            )
-            implementation(object, layoutSelector)
-            if let pocket = object as? UIView {
-                _ = applyLegacyProgressiveBlurMask(
-                    in: pocket,
-                    edge: edge
-                )
-            }
-        }
-        let layoutOverride = unsafe imp_implementationWithBlock(
-            layoutBlock
-        )
-        guard unsafe class_addMethod(
-            subclass,
-            layoutSelector,
-            layoutOverride,
-            method_getTypeEncoding(layoutMethod)
-        ) else {
-            unsafe imp_removeBlock(setFrameOverride)
-            unsafe imp_removeBlock(layoutOverride)
-            objc_disposeClassPair(subclass)
-            return nil
-        }
-        objc_registerClassPair(subclass)
-        return subclass
     }
 
     private static func alignedEdgeEffectPocketClassName(
@@ -1609,48 +913,24 @@ enum ExpandedPaginationRuntime {
         return nil
     }
 
-    private static func floatingTabBar(
-        for collectionView: UICollectionView
-    ) -> UIView? {
-        let layout = collectionView.collectionViewLayout
-        guard layout.responds(
-            to: PrivateUIKitRuntimeNames.floatingTabBarSelector
-        ) else {
-            return nil
-        }
-        return unsafe layout
-            .perform(PrivateUIKitRuntimeNames.floatingTabBarSelector)?
-            .takeUnretainedValue() as? UIView
+    private static func floatingTabBar(for collectionView: UICollectionView) -> UIView? {
+        view(
+            from: collectionView.collectionViewLayout,
+            selector: PrivateUIKitRuntimeNames.floatingTabBarSelector)
     }
 
-    private static func pageButtonContentOpacity(
-        of pageButton: UIView
-    ) -> CGFloat? {
-        let selector =
-            PrivateUIKitRuntimeNames.pageButtonContentOpacitySelector
-        guard pageButton.responds(to: selector) else {
-            return nil
-        }
-        let implementation = unsafe unsafeBitCast(
-            pageButton.method(for: selector),
-            to: PageButtonContentOpacityImplementation.self
-        )
-        let opacity = implementation(pageButton, selector)
-        guard opacity.isFinite else {
-            return nil
-        }
+    private static func pageButtonContentOpacity(of pageButton: UIView) -> CGFloat? {
+        guard
+            let opacity = value(
+                in: pageButton, selector: PrivateUIKitRuntimeNames.pageButtonContentOpacitySelector,
+                as: CGFloat.self
+            ), opacity.isFinite
+        else { return nil }
         return opacity
     }
 
-    private static func view(
-        from object: AnyObject,
-        selector: Selector
-    ) -> UIView? {
-        guard object.responds(to: selector) else {
-            return nil
-        }
-        return unsafe object.perform(selector)?
-            .takeUnretainedValue() as? UIView
+    private static func view(from object: AnyObject, selector: Selector) -> UIView? {
+        value(in: object, selector: selector, as: UIView.self)
     }
 
     private static func visibleItemIndexPath(
@@ -1725,33 +1005,22 @@ enum ExpandedPaginationRuntime {
         cell.contentView.alpha = 1
     }
 
-    private static func collectionView(
-        in floatingTabBar: UIView
-    ) -> UICollectionView? {
-        guard floatingTabBar.responds(
-            to: PrivateUIKitRuntimeNames.itemsViewSelector
-        ) else {
-            return nil
-        }
-        return unsafe floatingTabBar
-            .perform(PrivateUIKitRuntimeNames.itemsViewSelector)?
-            .takeUnretainedValue() as? UICollectionView
+    private static func collectionView(in floatingTabBar: UIView) -> UICollectionView? {
+        value(
+            in: floatingTabBar, selector: PrivateUIKitRuntimeNames.itemsViewSelector,
+            as: UICollectionView.self)
     }
 
-    private static func originalContentOffsetImplementation(
-        for collectionView: UICollectionView
-    ) -> IMP? {
+    private static func originalContentOffsetImplementation(for collectionView: UICollectionView)
+        -> ContentOffsetImplementation?
+    {
         guard let runtimeClass = object_getClass(collectionView),
-              let baseClass = class_getSuperclass(runtimeClass),
-              let method = unsafe verifiedMethod(
-                on: baseClass,
-                selector:
-                    PrivateUIKitRuntimeNames.contentOffsetForPageSelector,
-                typeEncoding: expectedContentOffsetForPageTypeEncoding
-              ) else {
-            return nil
-        }
-        return unsafe method_getImplementation(method)
+            let baseClass = class_getSuperclass(runtimeClass)
+        else { return nil }
+        return try? ABIRuntime.shared.objcImplementation(
+            on: baseClass, selector: PrivateUIKitRuntimeNames.contentOffsetForPageSelector,
+            as: ((Int) -> CGPoint).self
+        )
     }
 
     static func semanticPageModelWidth(
@@ -1786,66 +1055,35 @@ enum ExpandedPaginationRuntime {
 
     private static func semanticContentWidth(
         in collectionView: UICollectionView,
-        originalContentOffsetImplementation: IMP,
-        contentOffsetSelector: Selector
+        originalContentOffsetImplementation: ContentOffsetImplementation
     ) -> CGFloat? {
-        guard collectionView.responds(
-            to: PrivateUIKitRuntimeNames.pagesSelector
-        ),
-              let pages = unsafe collectionView
-                .perform(PrivateUIKitRuntimeNames.pagesSelector)?
-                .takeUnretainedValue() as? NSArray,
-              pages.count > 0 else {
-            return nil
-        }
-
-        let originalContentOffset = unsafe unsafeBitCast(
-            originalContentOffsetImplementation,
-            to: ContentOffsetForPageImplementation.self
-        )
+        guard
+            let pages = value(
+                in: collectionView, selector: PrivateUIKitRuntimeNames.pagesSelector,
+                as: NSArray.self),
+            pages.count > 0
+        else { return nil }
         // UICollectionView materializes its content extent lazily. UIKit's
         // page model already owns the complete boundary-page geometry.
-        let firstPageIndex = 0
-        let finalPageIndex = pages.count - 1
-        let pageGeometry: (Int) -> (origin: CGFloat, width: CGFloat)? = {
-            pageIndex in
+        let pageGeometry: (Int) -> (origin: CGFloat, width: CGFloat)? = { pageIndex in
             let page = pages[pageIndex] as AnyObject
-            guard let widthMethod = unsafe verifiedMethod(
-                on: type(of: page),
-                selector: PrivateUIKitRuntimeNames.pageWidthSelector,
-                typeEncoding: expectedPageWidthTypeEncoding
-            ) else {
-                return nil
-            }
-            let width = unsafe unsafeBitCast(
-                method_getImplementation(widthMethod),
-                to: PageWidthImplementation.self
-            )(
-                page,
-                PrivateUIKitRuntimeNames.pageWidthSelector
-            )
-            let origin = originalContentOffset(
-                collectionView,
-                contentOffsetSelector,
-                pageIndex
-            ).x
-            guard origin.isFinite,
-                  width.isFinite,
-                  width >= 0 else {
-                return nil
-            }
-            return (origin, width)
+            guard
+                let width = value(
+                    in: page, selector: PrivateUIKitRuntimeNames.pageWidthSelector, as: CGFloat.self
+                ),
+                let offset = try? unsafe originalContentOffsetImplementation.unsafeInvoke(
+                    on: collectionView, pageIndex),
+                offset.x.isFinite, width.isFinite, width >= 0
+            else { return nil }
+            return (offset.x, width)
         }
-        guard let firstPage = pageGeometry(firstPageIndex),
-              let finalPage = pageGeometry(finalPageIndex),
+        guard let firstPage = pageGeometry(0),
+            let finalPage = pageGeometry(pages.count - 1),
               let semanticWidth = semanticPageModelWidth(
-                firstPageOrigin: firstPage.origin,
-                firstPageWidth: firstPage.width,
-                finalPageOrigin: finalPage.origin,
-                finalPageWidth: finalPage.width
-              ) else {
-            return nil
-        }
+                firstPageOrigin: firstPage.origin, firstPageWidth: firstPage.width,
+                finalPageOrigin: finalPage.origin, finalPageWidth: finalPage.width
+            )
+        else { return nil }
         return max(collectionView.contentSize.width, semanticWidth)
     }
 
@@ -1857,12 +1095,9 @@ enum ExpandedPaginationRuntime {
         guard let floatingTabBar = object as? UIView,
               let collectionView = collectionView(in: floatingTabBar),
               collectionView === scrollView,
-              collectionView.responds(
-                to: PrivateUIKitRuntimeNames.pagesSelector
-              ),
-              let pages = unsafe collectionView
-                .perform(PrivateUIKitRuntimeNames.pagesSelector)?
-                .takeUnretainedValue() as? NSArray,
+            let pages = value(
+                in: collectionView, selector: PrivateUIKitRuntimeNames.pagesSelector,
+                as: NSArray.self),
               pages.count > 0,
               let originalContentOffsetImplementation =
                 originalContentOffsetImplementation(
@@ -1876,14 +1111,12 @@ enum ExpandedPaginationRuntime {
         // Clamp only predictions beyond the semantic first or final edge now;
         // otherwise releasing the trailing arrow reservation causes a second
         // correction in a later layout pass.
-        targetContentOffset.pointee = clampedContentOffset(
-            targetContentOffset.pointee,
+        unsafe targetContentOffset.pointee = clampedContentOffset(
+            unsafe targetContentOffset.pointee,
             forPage: pages.count - 1,
             in: collectionView,
             originalContentOffsetImplementation:
-                originalContentOffsetImplementation,
-            contentOffsetSelector:
-                PrivateUIKitRuntimeNames.contentOffsetForPageSelector
+                originalContentOffsetImplementation
         )
     }
 
@@ -1891,8 +1124,7 @@ enum ExpandedPaginationRuntime {
         _ contentOffset: CGPoint,
         forPage page: Int,
         in collectionView: UICollectionView,
-        originalContentOffsetImplementation: IMP,
-        contentOffsetSelector: Selector
+        originalContentOffsetImplementation: ContentOffsetImplementation
     ) -> CGPoint {
         let viewportWidth = pageViewportWidth(
             for: collectionView,
@@ -1901,8 +1133,7 @@ enum ExpandedPaginationRuntime {
         let contentWidth = semanticContentWidth(
             in: collectionView,
             originalContentOffsetImplementation:
-                originalContentOffsetImplementation,
-            contentOffsetSelector: contentOffsetSelector
+                    originalContentOffsetImplementation
         ) ?? collectionView.contentSize.width
         guard let range = naturalHorizontalScrollRange(
             in: collectionView,
@@ -1920,39 +1151,27 @@ enum ExpandedPaginationRuntime {
     private static func pageProgress(
         for contentOffset: CGPoint,
         in collectionView: UICollectionView,
-        originalContentOffsetImplementation: IMP,
-        contentOffsetSelector: Selector,
+        originalContentOffsetImplementation: ContentOffsetImplementation,
         clamped: Bool
     ) -> CGFloat? {
-        guard collectionView.responds(
-            to: PrivateUIKitRuntimeNames.pagesSelector
-        ),
-              let pages = unsafe collectionView
-                .perform(PrivateUIKitRuntimeNames.pagesSelector)?
-                .takeUnretainedValue() as? NSArray,
+        guard
+            let pages = value(
+                in: collectionView, selector: PrivateUIKitRuntimeNames.pagesSelector,
+                as: NSArray.self),
               pages.count > 0 else {
             return nil
         }
 
-        let originalContentOffset = unsafe unsafeBitCast(
-            originalContentOffsetImplementation,
-            to: ContentOffsetForPageImplementation.self
-        )
-        let targets = (0..<pages.count).map { page in
-            let originalTarget = originalContentOffset(
-                collectionView,
-                contentOffsetSelector,
-                page
-            )
+        guard
+            let targets = try? (0..<pages.count).map({ page in
+                let originalTarget = try unsafe originalContentOffsetImplementation.unsafeInvoke(
+                    on: collectionView, page)
             return clampedContentOffset(
-                originalTarget,
-                forPage: page,
-                in: collectionView,
-                originalContentOffsetImplementation:
-                    originalContentOffsetImplementation,
-                contentOffsetSelector: contentOffsetSelector
+                    originalTarget, forPage: page, in: collectionView,
+                    originalContentOffsetImplementation: originalContentOffsetImplementation
             ).x
-        }
+            })
+        else { return nil }
         guard targets.count > 1 else {
             return 0
         }
@@ -2048,57 +1267,28 @@ enum ExpandedPaginationRuntime {
         pageProgress: CGFloat
     ) -> CGFloat? {
         guard pageProgress.isFinite,
-              collectionView.responds(
-                to: PrivateUIKitRuntimeNames.pagesSelector
-              ),
-              let pages = unsafe collectionView
-                .perform(PrivateUIKitRuntimeNames.pagesSelector)?
-                .takeUnretainedValue() as? NSArray,
+            let pages = value(
+                in: collectionView, selector: PrivateUIKitRuntimeNames.pagesSelector,
+                as: NSArray.self),
               pages.count > 0 else {
             return nil
         }
 
-        let layout = collectionView.collectionViewLayout
-        guard layout.responds(
-            to: PrivateUIKitRuntimeNames.floatingTabBarSelector
-        ),
-              let floatingTabBar = unsafe layout
-                .perform(PrivateUIKitRuntimeNames.floatingTabBarSelector)?
-                .takeUnretainedValue() as? UIView,
-              floatingTabBar.responds(
-                to: PrivateUIKitRuntimeNames.leftArrowButtonSelector
-              ),
-              floatingTabBar.responds(
-                to: PrivateUIKitRuntimeNames.rightArrowButtonSelector
-              ),
-              floatingTabBar.responds(
-                to: PrivateUIKitRuntimeNames.currentPlatformMetricsSelector
-              ),
-              let leftArrowButton = unsafe floatingTabBar
-                .perform(PrivateUIKitRuntimeNames.leftArrowButtonSelector)?
-                .takeUnretainedValue() as? UIView,
-              let rightArrowButton = unsafe floatingTabBar
-                .perform(PrivateUIKitRuntimeNames.rightArrowButtonSelector)?
-                .takeUnretainedValue() as? UIView,
-              let metrics = unsafe floatingTabBar
-                .perform(PrivateUIKitRuntimeNames.currentPlatformMetricsSelector)?
-                .takeUnretainedValue() as? NSObject,
-              metrics.responds(
-                to: PrivateUIKitRuntimeNames.backgroundInsetsSelector
-              ) else {
+        guard let floatingTabBar = floatingTabBar(for: collectionView),
+            let leftArrowButton = view(
+                from: floatingTabBar, selector: PrivateUIKitRuntimeNames.leftArrowButtonSelector),
+            let rightArrowButton = view(
+                from: floatingTabBar, selector: PrivateUIKitRuntimeNames.rightArrowButtonSelector),
+            let metrics = value(
+                in: floatingTabBar,
+                selector: PrivateUIKitRuntimeNames.currentPlatformMetricsSelector,
+                as: AnyObject.self),
+            let backgroundInsets = value(
+                in: metrics, selector: PrivateUIKitRuntimeNames.backgroundInsetsSelector,
+                as: UIEdgeInsets.self)
+        else {
             return nil
         }
-
-        let backgroundInsetsImplementation = unsafe unsafeBitCast(
-            metrics.method(
-                for: PrivateUIKitRuntimeNames.backgroundInsetsSelector
-            ),
-            to: BackgroundInsetsImplementation.self
-        )
-        let backgroundInsets = backgroundInsetsImplementation(
-            metrics,
-            PrivateUIKitRuntimeNames.backgroundInsetsSelector
-        )
         let outerWidth = floatingTabBar.bounds.width
         let leftArrowWidth = leftArrowButton.bounds.width
         let rightArrowWidth = rightArrowButton.bounds.width
@@ -2146,28 +1336,53 @@ enum ExpandedPaginationRuntime {
         return viewportWidth
     }
 
-    private static func verifiedBackgroundInsetsMethod() -> Bool {
-        guard let metricsClass = verifiedPlatformMetricsBaseClass() else {
-            return false
+    private static func makeSubclass(
+        of baseClass: AnyClass,
+        named name: String,
+        requests: (AnyClass) throws -> [NativeObjCHookRequest]
+    ) -> AnyClass? {
+        let subclass: AnyClass
+        if let existing = NSClassFromString(name) {
+            guard class_getSuperclass(existing) === baseClass else {
+                scrollableTabBarLogger.fault(
+                    "The ScrollableTabBar runtime class has an unexpected superclass.")
+                return nil
+            }
+            subclass = existing
+        } else {
+            guard let allocated = unsafe objc_allocateClassPair(baseClass, name, 0) else {
+                return nil
+            }
+            objc_registerClassPair(allocated)
+            subclass = allocated
         }
-        return unsafe verifiedMethod(
-            on: metricsClass,
-            selector: PrivateUIKitRuntimeNames.backgroundInsetsSelector,
-            typeEncoding: expectedBackgroundInsetsTypeEncoding
-        ) != nil
+        if hooksByClass[name] == nil {
+            do {
+                hooksByClass[name] = try unsafe ABIRuntime.shared.installHooks(requests(subclass))
+            } catch {
+                // Published ABIBridge dispatchers retain their class for the process
+                // lifetime, even after a failed batch invalidates its registrations.
+                scrollableTabBarLogger.error(
+                    "Could not prepare UIKit pagination overrides: \(error)")
+                return nil
+            }
+        }
+        return subclass
     }
 
-    private static func verifiedMethod(
-        on type: AnyClass,
-        selector: Selector,
-        typeEncoding expectedTypeEncoding: String
-    ) -> Method? {
-        guard let method = unsafe class_getInstanceMethod(type, selector),
-              let typeEncoding = unsafe method_getTypeEncoding(method),
-              unsafe String(cString: typeEncoding)
-                == expectedTypeEncoding else {
+    nonisolated private static func reportHookFailure(_ error: any Error) {
+        scrollableTabBarLogger.error("UIKit pagination override failed: \(error)")
+    }
+
+    private static func value<Value>(in object: AnyObject, selector: Selector, as type: Value.Type)
+        -> Value?
+    {
+        guard
+            let getter = try? ABIRuntime.shared.object(object).method(
+                selector: selector, as: (() -> Value).self)
+        else {
             return nil
         }
-        return unsafe method
+        return try? unsafe getter.unsafeInvoke()
     }
 }

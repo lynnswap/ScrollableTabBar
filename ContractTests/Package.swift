@@ -11,7 +11,7 @@ let strictSwiftSettings: [SwiftSetting] = [
 let package = Package(
     name: "ScrollableTabBarProductContract",
     platforms: [
-        .iOS(.v18),
+        .iOS("18.4"),
     ],
     dependencies: [
         .package(path: ".."),

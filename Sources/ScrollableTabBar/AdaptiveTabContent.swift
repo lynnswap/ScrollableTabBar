@@ -3,37 +3,25 @@ import UIKit
 @MainActor
 final class AdaptiveTabContent: ScrollableTabBarContent {
     var view: UIView { adaptiveView }
-    var selectionHandler: ((Int) -> Void)?
+    var selectionHandler: ((AnyHashable) -> Void)?
     var intrinsicHeight: CGFloat {
         max(scrollableTabBarMinimumHeight, adaptiveView.intrinsicContentSize.height)
     }
     let adaptiveView: AdaptiveTabView
     let segmentedControl: UISegmentedControl
     let menuButton: UIButton
-    private let items: [ScrollableTabBarPresentationItem]
+    private var items: [ScrollableTabBarPresentationItem]
 
     init(items: [ScrollableTabBarPresentationItem]) {
         self.items = items
-        // Public segmented and menu APIs expose UIActions rather than per-item
-        // views. UIMenuElement's accessibility identity keeps the same item ID
-        // without coupling it to UIAction's separate semantic identifier.
-        segmentedControl = UISegmentedControl(
-            frame: .zero,
-            actions: items.map { item in
-                let action = UIAction(
-                    title: item.title,
-                    image: item.image
-                ) { _ in }
-                action.accessibilityIdentifier = item.accessibilityIdentifier
-                return action
-            }
-        )
+        segmentedControl = UISegmentedControl(frame: .zero)
         menuButton = UIButton(type: .system)
         menuButton.showsMenuAsPrimaryAction = true
         adaptiveView = AdaptiveTabView(
             segmentedControl: segmentedControl,
             menuButton: menuButton
         )
+        _ = setItems(items, selectedIndex: nil)
         segmentedControl.addAction(
             UIAction { [weak self] _ in
                 self?.valueChanged()
@@ -42,31 +30,43 @@ final class AdaptiveTabContent: ScrollableTabBarContent {
         )
     }
 
+    func setItems(_ items: [ScrollableTabBarPresentationItem], selectedIndex: Int?) -> Bool {
+        self.items = items
+        segmentedControl.removeAllSegments()
+        for (index, item) in items.enumerated() {
+            let action = UIAction(title: item.title, image: item.image) { _ in }
+            action.accessibilityIdentifier = item.accessibilityIdentifier
+            segmentedControl.insertSegment(action: action, at: index, animated: false)
+        }
+        adaptiveView.isHidden = items.isEmpty
+        return true
+    }
+
     func render(
-        selectedIndex: Int,
+        selectedIndex: Int?,
         isEnabled: Bool,
         accessibilityLabel: String?,
         accessibilityIdentifier: String?
     ) {
-        let selectedItem = items[selectedIndex]
-        segmentedControl.isEnabled = isEnabled
-        segmentedControl.selectedSegmentIndex = selectedIndex
+        let selectedItem = selectedIndex.map { items[$0] }
+        segmentedControl.isEnabled = isEnabled && !items.isEmpty
+        segmentedControl.selectedSegmentIndex = selectedIndex ?? UISegmentedControl.noSegment
         segmentedControl.accessibilityLabel = accessibilityLabel
-        segmentedControl.accessibilityValue = selectedItem.title
+        segmentedControl.accessibilityValue = selectedItem?.title
         segmentedControl.accessibilityIdentifier = accessibilityIdentifier
         for index in items.indices {
             segmentedControl.setEnabled(isEnabled, forSegmentAt: index)
         }
 
         var buttonConfiguration = menuButton.configuration ?? .plain()
-        buttonConfiguration.title = selectedItem.title
+        buttonConfiguration.title = selectedItem?.title
         buttonConfiguration.image = UIImage(systemName: "chevron.down")
         buttonConfiguration.imagePlacement = .trailing
         buttonConfiguration.imagePadding = 6
         menuButton.configuration = buttonConfiguration
-        menuButton.isEnabled = isEnabled
+        menuButton.isEnabled = isEnabled && !items.isEmpty
         menuButton.accessibilityLabel = accessibilityLabel
-        menuButton.accessibilityValue = selectedItem.title
+        menuButton.accessibilityValue = selectedItem?.title
         menuButton.accessibilityIdentifier = accessibilityIdentifier
         menuButton.menu = UIMenu(
             options: .singleSelection,
@@ -76,7 +76,7 @@ final class AdaptiveTabContent: ScrollableTabBarContent {
                     image: item.image,
                     state: index == selectedIndex ? .on : .off
                 ) { [weak self] _ in
-                    self?.selectionHandler?(index)
+                    self?.selectionHandler?(item.id)
                 }
                 action.accessibilityIdentifier = item.accessibilityIdentifier
                 return action
@@ -96,7 +96,7 @@ final class AdaptiveTabContent: ScrollableTabBarContent {
             )
             return
         }
-        selectionHandler?(segmentedControl.selectedSegmentIndex)
+        selectionHandler?(items[segmentedControl.selectedSegmentIndex].id)
     }
 }
 

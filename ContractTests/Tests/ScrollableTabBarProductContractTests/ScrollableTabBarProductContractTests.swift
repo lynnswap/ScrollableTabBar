@@ -34,6 +34,33 @@ func publicProductSupportsTypedSelectionAndDelegateCallbacks() {
 }
 
 @MainActor
+@Test
+func publicProductSupportsDynamicItemsAndNoSelection() {
+    let control = ScrollableTabBar<ContractWorkspaceSection>()
+    #expect(control.items.isEmpty)
+    #expect(control.selectedID == nil)
+
+    var items: [ScrollableTabBar<ContractWorkspaceSection>.Item] = [
+        .init(id: .canvas, title: "Canvas"),
+        .init(id: .activity, title: "Activity"),
+    ]
+    control.setItems(items, selectedID: .activity)
+    items.removeAll { $0.id == .activity }
+    items[0].title = "Workspace"
+    items.append(.init(id: .settings, title: "Settings"))
+    control.setItems(items, selectedID: .settings)
+    #expect(control.items.map(\.id) == [.canvas, .settings])
+    #expect(control.items.first?.title == "Workspace")
+    #expect(control.selectedID == .settings)
+
+    control.selectedID = nil
+    #expect(control.selectedID == nil)
+    control.setItems([], selectedID: nil)
+    #expect(control.items.isEmpty)
+    #expect(control.selectedID == nil)
+}
+
+@MainActor
 private final class ContractWorkspaceViewController: UIViewController,
     ScrollableTabBarDelegate
 {

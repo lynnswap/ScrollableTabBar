@@ -12,7 +12,7 @@ private enum TabID: Hashable {
 @MainActor
 private final class SelectionRecorder<ID: Hashable>: ScrollableTabBarDelegate {
     private(set) var selections: [ID] = []
-    private(set) var controlSelections: [ID] = []
+    private(set) var controlSelections: [ID?] = []
 
     func scrollableTabBar(
         _ tabBar: ScrollableTabBar<ID>,
@@ -49,13 +49,13 @@ struct ScrollableTabBarTests {
         let recorder = SelectionRecorder<TabID>()
         control.delegate = recorder
 
-        control.didSelectItem(at: 3)
+        control.didSelectItem(id: .security)
 
         #expect(control.selectedID == .security)
         #expect(recorder.selections == [.security])
         #expect(recorder.controlSelections == [.security])
 
-        control.didSelectItem(at: 3)
+        control.didSelectItem(id: .security)
 
         #expect(recorder.selections == [.security])
     }
@@ -67,19 +67,20 @@ struct ScrollableTabBarTests {
         control.delegate = recorder
         control.isEnabled = false
 
-        control.didSelectItem(at: 2)
+        control.didSelectItem(id: .cookies)
 
         #expect(control.selectedID == .preview)
         #expect(recorder.selections.isEmpty)
     }
 
     @Test
-    func invalidContentSelectionRestoresTheCurrentProjection() {
+    func ignoresSelectionFromARemovedItem() {
         let control = makeControl(selectedID: .preview)
         let recorder = SelectionRecorder<TabID>()
         control.delegate = recorder
 
-        control.didSelectItem(at: 99)
+        control.setItems(control.items.filter { $0.id != .security }, selectedID: .preview)
+        control.didSelectItem(id: .security)
 
         #expect(control.selectedID == .preview)
         #expect(recorder.selections.isEmpty)
@@ -141,6 +142,67 @@ struct ScrollableTabBarTests {
                 == preferredSize
         )
         #expect(control.sizeThatFits(.zero) == preferredSize)
+    }
+
+    @Test
+    func updatesItemsAndSelectionTogetherWithoutNotifyingTheDelegate() {
+        let control = makeControl(selectedID: .preview)
+        let recorder = SelectionRecorder<TabID>()
+        control.delegate = recorder
+        var updated = control.items.filter { $0.id != .preview }
+        updated.reverse()
+        updated[0].title = "Permissions"
+        updated[0].image = UIImage(systemName: "lock")
+        control.setItems(updated, selectedID: .security)
+
+        #expect(control.items.map(\.id) == [.security, .cookies, .headers])
+        #expect(control.items.first?.title == "Permissions")
+        #expect(control.items.first?.image != nil)
+        #expect(control.selectedID == .security)
+        #expect(recorder.selections.isEmpty)
+        control.selectedID = nil
+        #expect(control.selectedID == nil)
+        #expect(recorder.selections.isEmpty)
+    }
+
+    @Test
+    func startsEmptyAndCanPopulateClearAndRefill() {
+        let control = ScrollableTabBar<TabID>()
+        let recorder = SelectionRecorder<TabID>()
+        control.delegate = recorder
+        #expect(control.items.isEmpty)
+        #expect(control.selectedID == nil)
+
+        let items: [ScrollableTabBar<TabID>.Item] = [.init(id: .headers, title: "Headers")]
+        control.setItems(items, selectedID: .headers)
+        #expect(control.selectedID == .headers)
+        control.setItems([], selectedID: nil)
+        #expect(control.items.isEmpty)
+        #expect(control.selectedID == nil)
+        #expect(control.content.view.isHidden)
+        control.setItems(items, selectedID: nil)
+        #expect(control.items.map(\.id) == [.headers])
+        #expect(control.selectedID == nil)
+        #expect(recorder.selections.isEmpty)
+        control.didSelectItem(id: .headers)
+        #expect(recorder.selections == [.headers])
+    }
+
+    @Test
+    func delayedSelectionUsesStableIdentityAfterReordering() throws {
+        let control = makeControl(selectedID: .headers)
+        let handler = try #require(control.content.selectionHandler)
+        let recorder = SelectionRecorder<TabID>()
+        control.delegate = recorder
+        control.setItems(Array(control.items.reversed()), selectedID: .headers)
+        handler(AnyHashable(TabID.cookies))
+        #expect(control.selectedID == .cookies)
+        #expect(recorder.selections == [.cookies])
+
+        control.setItems(control.items.filter { $0.id != .cookies }, selectedID: .headers)
+        handler(AnyHashable(TabID.cookies))
+        #expect(control.selectedID == .headers)
+        #expect(recorder.selections == [.cookies])
     }
 
     private func makeControl(selectedID: TabID) -> ScrollableTabBar<TabID> {

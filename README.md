@@ -12,15 +12,15 @@ whose overflow items remain horizontally reachable.
 
 ## Requirements
 
-- iOS 18.0+
+- iOS 18.4+
 - Swift 6.3+
 
 ## State Ownership
 
 The app remains the source of truth for each item's domain identity, membership
 and order, selected value, and corresponding content. `ScrollableTabBar`
-projects that selection into UIKit. Create a new control when membership or
-order changes.
+projects that selection into UIKit. Apply changes to membership, order, display
+content, and selection together with `setItems(_:selectedID:)`.
 
 See [Selection Ownership](https://lynnswap.github.io/ScrollableTabBar/documentation/scrollabletabbar/selectionownership/)
 for programmatic and user-driven selection behavior.
@@ -78,6 +78,33 @@ final class DashboardViewController: UIViewController, ScrollableTabBarDelegate 
     }
 }
 ```
+
+## Updating Tabs
+
+Pass the application's updated items and selection to the same control:
+
+```swift
+var items: [ScrollableTabBar<String>.Item] = [
+    .init(id: "inbox", title: "Inbox"),
+    .init(id: "archive", title: "Archive"),
+]
+let tabBar = ScrollableTabBar(items: items, selectedID: "inbox")
+
+items.append(.init(id: "drafts", title: "Drafts"))
+tabBar.setItems(items, selectedID: "drafts")
+
+items.removeAll { $0.id == "drafts" }
+tabBar.setItems(items, selectedID: "inbox")
+
+tabBar.setItems([], selectedID: nil)
+```
+
+Item IDs must be unique. A non-`nil` selection must belong to the supplied
+items; `nil` means no selection. Programmatic updates do not call the delegate.
+`ScrollableTabBar<ID>()` creates an empty control that can be populated later.
+
+`selectedID` is now optional. When migrating existing code that reads it,
+handle the absence of a selection before rendering the selected content.
 
 ## Presentation
 

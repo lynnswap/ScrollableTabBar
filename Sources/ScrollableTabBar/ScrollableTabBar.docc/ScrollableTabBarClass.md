@@ -23,7 +23,8 @@ guarantees.
 - ``init(items:selectedID:)``
 - ``Item``
 
-### Reading State
+### Updating and Reading State
 
+- ``setItems(_:selectedID:)``
 - ``items``
 - ``selectedID``

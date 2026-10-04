@@ -11,7 +11,7 @@ let strictSwiftSettings: [SwiftSetting] = [
 let package = Package(
     name: "ScrollableTabBar",
     platforms: [
-        .iOS(.v18),
+        .iOS("18.4"),
     ],
     products: [
         .library(
@@ -19,9 +19,13 @@ let package = Package(
             targets: ["ScrollableTabBar"]
         ),
     ],
+    dependencies: [
+        .package(url: "https://github.com/lynnswap/ABIBridge.git", .upToNextMinor(from: "0.8.0")),
+    ],
     targets: [
         .target(
             name: "ScrollableTabBar",
+            dependencies: ["ABIBridge"],
             swiftSettings: strictSwiftSettings
         ),
         .testTarget(

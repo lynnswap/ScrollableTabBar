@@ -5,7 +5,7 @@ horizontally reachable.
 
 ## Overview
 
-`ScrollableTabBar` is an iOS 18 `UIView` for compact tab selection. Give every
+`ScrollableTabBar` is an iOS 18.4 `UIView` for compact tab selection. Give every
 item a stable domain ID and use ``ScrollableTabBarDelegate`` to route user
 selection back into application state. The package requires Swift 6.3; the
 control has no explicit shutdown operation and follows the containing view

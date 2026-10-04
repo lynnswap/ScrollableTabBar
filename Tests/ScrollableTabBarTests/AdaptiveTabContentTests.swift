@@ -43,7 +43,7 @@ struct AdaptiveTabContentTests {
     @Test
     func segmentedSelectionUsesItsUIActionPath() {
         let content = makeContent()
-        var selectedIndices: [Int] = []
+        var selectedIndices: [AnyHashable] = []
         content.selectionHandler = { index in
             selectedIndices.append(index)
         }
@@ -121,25 +121,77 @@ struct AdaptiveTabContentTests {
         )
     }
 
+    @Test
+    func updatesBothPresentationsAndClearsSelection() throws {
+        let content = makeContent()
+        let updated: [ScrollableTabBarPresentationItem] = [
+            .init(
+                id: 3, title: "Permissions", image: nil, accessibilityIdentifier: "Updated.Security"
+            ),
+            .init(id: 4, title: "Timing", image: nil, accessibilityIdentifier: "Updated.Timing"),
+        ]
+        #expect(content.setItems(updated, selectedIndex: nil))
+        content.render(
+            selectedIndex: nil, isEnabled: true, accessibilityLabel: "Mode",
+            accessibilityIdentifier: "Control")
+        #expect(content.segmentedControl.numberOfSegments == 2)
+        #expect(content.segmentedControl.selectedSegmentIndex == UISegmentedControl.noSegment)
+        #expect(content.segmentedControl.accessibilityValue == nil)
+        let actions = try #require(content.menuButton.menu?.children.compactMap { $0 as? UIAction })
+        #expect(actions.map(\.title) == ["Permissions", "Timing"])
+        #expect(actions.map(\.state) == [.off, .off])
+
+        #expect(content.setItems([], selectedIndex: nil))
+        content.render(
+            selectedIndex: nil, isEnabled: true, accessibilityLabel: "Mode",
+            accessibilityIdentifier: "Control")
+        #expect(content.segmentedControl.numberOfSegments == 0)
+        #expect(content.menuButton.menu?.children.isEmpty == true)
+        #expect(content.view.isHidden)
+    }
+
+    @Test
+    func menuActionsKeepTheirIDsAcrossUpdates() throws {
+        let content = makeContent()
+        content.render(
+            selectedIndex: 0, isEnabled: true, accessibilityLabel: nil, accessibilityIdentifier: nil
+        )
+        let action = try #require(content.menuButton.menu?.children.last as? UIAction)
+        var selectedIDs: [AnyHashable] = []
+        content.selectionHandler = { selectedIDs.append($0) }
+        #expect(
+            content.setItems(
+                [
+                    .init(id: 3, title: "Permissions", image: nil, accessibilityIdentifier: nil),
+                    .init(id: 0, title: "Headers", image: nil, accessibilityIdentifier: nil),
+                ], selectedIndex: 1))
+        content.menuButton.sendAction(action)
+        #expect(selectedIDs == [3])
+    }
+
     private func makeContent() -> AdaptiveTabContent {
         AdaptiveTabContent(
             items: [
                 .init(
+                    id: 0,
                     title: "Headers",
                     image: nil,
                     accessibilityIdentifier: "ScrollableTabBar.Test.0"
                 ),
                 .init(
+                    id: 1,
                     title: "Preview",
                     image: nil,
                     accessibilityIdentifier: "ScrollableTabBar.Test.1"
                 ),
                 .init(
+                    id: 2,
                     title: "Cookies",
                     image: nil,
                     accessibilityIdentifier: "ScrollableTabBar.Test.2"
                 ),
                 .init(
+                    id: 3,
                     title: "Security",
                     image: nil,
                     accessibilityIdentifier: "ScrollableTabBar.Test.3"

@@ -96,6 +96,7 @@ private final class ContractWorkspaceViewController: UIViewController,
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        sectionControl.sizeToFit()
         navigationItem.titleView = sectionControl
         render(selectedSection)
     }

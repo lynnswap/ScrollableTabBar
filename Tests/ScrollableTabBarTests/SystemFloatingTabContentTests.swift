@@ -471,6 +471,8 @@ struct SystemFloatingTabContentTests {
         let root = UIViewController()
         root.navigationItem.backButtonDisplayMode = .minimal
         let detail = UIViewController()
+        // Give legacy navigation bars an initial title-view size to fit.
+        control.sizeToFit()
         detail.navigationItem.titleView = control
         detail.navigationItem.rightBarButtonItem = UIBarButtonItem(
             systemItem: .done
@@ -484,6 +486,7 @@ struct SystemFloatingTabContentTests {
         let bar = content.floatingView.floatingTabBar
         bar.layoutIfNeeded()
 
+        try #require(collection.bounds.width > 0)
         #expect(collection.contentSize.width > collection.bounds.width)
         let edge = overscroll < 0
             ? -collection.adjustedContentInset.left

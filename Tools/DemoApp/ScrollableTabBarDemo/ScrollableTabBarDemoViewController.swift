@@ -53,6 +53,7 @@ final class ScrollableTabBarDemoViewController: UIViewController,
         sectionControl.accessibilityIdentifier = "ScrollableTabBarDemo.Control"
         sectionControl.accessibilityLabel = "Inspector section"
         sectionControl.delegate = self
+        sectionControl.sizeToFit()
         navigationItem.titleView = sectionControl
         let doneItem = UIBarButtonItem(
             primaryAction: UIAction(

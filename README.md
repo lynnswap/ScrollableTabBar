@@ -61,6 +61,7 @@ final class DashboardViewController: UIViewController, ScrollableTabBarDelegate 
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        sectionControl.sizeToFit()
         navigationItem.titleView = sectionControl
         showSection(selectedSection)
     }

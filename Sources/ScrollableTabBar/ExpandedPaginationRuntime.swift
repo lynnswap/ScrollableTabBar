@@ -145,7 +145,7 @@ enum ExpandedPaginationRuntime {
 
     static func maximumContainerSize(of floatingTabBar: UIView) -> CGSize? {
         guard
-            let method = try? ABIRuntime.shared.object(floatingTabBar).method(
+            let method = try? ABIRuntime.shared.object(floatingTabBar).resolveMethodAndWait(
                 selector: PrivateUIKitRuntimeNames.maximumContainerSizeSelector,
                 as: (() -> CGSize).self
             )
@@ -221,11 +221,11 @@ enum ExpandedPaginationRuntime {
 
     private static func makeExpandedCollectionViewClass(baseClass: AnyClass) -> AnyClass? {
         makeSubclass(of: baseClass, named: expandedCollectionViewClassName) { subclass in
-            let originalContentOffset = try ABIRuntime.shared.objcImplementation(
+            let originalContentOffset = try ABIRuntime.shared.resolveObjCImplementationAndWait(
                 on: baseClass, selector: PrivateUIKitRuntimeNames.contentOffsetForPageSelector,
                 as: ((Int) -> CGPoint).self
             )
-            let currentPage = try ABIRuntime.shared.objcMethod(
+            let currentPage = try ABIRuntime.shared.resolveObjCMethodAndWait(
                 on: baseClass, selector: PrivateUIKitRuntimeNames.currentPageSelector,
                 as: (() -> CGFloat).self
             )
@@ -331,11 +331,11 @@ enum ExpandedPaginationRuntime {
         let leftEdgeEffect = collectionView.leftEdgeEffect
         let rightEdgeEffect = collectionView.rightEdgeEffect
         do {
-            let leftGeometry = try ABIRuntime.shared.object(leftEdgeEffect).method(
+            let leftGeometry = try ABIRuntime.shared.object(leftEdgeEffect).resolveMethodAndWait(
                 selector: PrivateUIKitRuntimeNames.edgeEffectGeometryViewWriteSelector,
                 as: ((UIView?) -> Void).self
             )
-            let rightGeometry = try ABIRuntime.shared.object(rightEdgeEffect).method(
+            let rightGeometry = try ABIRuntime.shared.object(rightEdgeEffect).resolveMethodAndWait(
                 selector: PrivateUIKitRuntimeNames.edgeEffectGeometryViewWriteSelector,
                 as: ((UIView?) -> Void).self
             )
@@ -417,19 +417,19 @@ enum ExpandedPaginationRuntime {
         guard let interaction = edgeEffectInteraction(in: collectionView) else { return false }
         do {
             let type: AnyClass = type(of: interaction)
-            _ = try ABIRuntime.shared.objcMethod(
+            _ = try ABIRuntime.shared.resolveObjCMethodAndWait(
                 on: type, selector: PrivateUIKitRuntimeNames.edgeEffectUpdateSelector,
                 as: (() -> Void).self
             )
-            _ = try ABIRuntime.shared.objcMethod(
+            _ = try ABIRuntime.shared.resolveObjCMethodAndWait(
                 on: type, selector: PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector,
                 as: ((UInt) -> UIView?).self
             )
-            _ = try ABIRuntime.shared.objcMethod(
+            _ = try ABIRuntime.shared.resolveObjCMethodAndWait(
                 on: type, selector: PrivateUIKitRuntimeNames.edgeEffectViewSelector,
                 as: (() -> UIView?).self
             )
-            _ = try ABIRuntime.shared.objcMethod(
+            _ = try ABIRuntime.shared.resolveObjCMethodAndWait(
                 on: type, selector: PrivateUIKitRuntimeNames.edgeCaptureViewSelector,
                 as: (() -> UIView?).self
             )
@@ -564,7 +564,7 @@ enum ExpandedPaginationRuntime {
               let floatingTabBar = object as? UIView,
               let collectionView = collectionView(in: floatingTabBar),
             let interaction = edgeEffectInteraction(in: collectionView),
-            let forcePocket = try? ABIRuntime.shared.object(interaction).method(
+            let forcePocket = try? ABIRuntime.shared.object(interaction).resolveMethodAndWait(
                 selector: PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector,
                 as: ((UInt) -> UIView?).self
             )
@@ -1017,7 +1017,7 @@ enum ExpandedPaginationRuntime {
         guard let runtimeClass = object_getClass(collectionView),
             let baseClass = class_getSuperclass(runtimeClass)
         else { return nil }
-        return try? ABIRuntime.shared.objcImplementation(
+        return try? ABIRuntime.shared.resolveObjCImplementationAndWait(
             on: baseClass, selector: PrivateUIKitRuntimeNames.contentOffsetForPageSelector,
             as: ((Int) -> CGPoint).self
         )
@@ -1378,7 +1378,7 @@ enum ExpandedPaginationRuntime {
         -> Value?
     {
         guard
-            let getter = try? ABIRuntime.shared.object(object).method(
+            let getter = try? ABIRuntime.shared.object(object).resolveMethodAndWait(
                 selector: selector, as: (() -> Value).self)
         else {
             return nil

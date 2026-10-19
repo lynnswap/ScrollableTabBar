@@ -31,9 +31,15 @@ jobs:
           xcodebuild -showsdks
           echo "Destination: ${DESTINATION}"
 
-      - name: Run package, product contract, and demo UI tests
+      - name: Test Simulator helper
+        run: python3 -m unittest discover -s .github/scripts -p 'test_simulator.py'
+
+      - name: Start the test Simulator
+        run: python3 .github/scripts/simulator.py prepare
+
+      - name: Build package, product contract, and demo UI tests
         run: |
-          xcodebuild test \
+          xcodebuild build-for-testing \
             -workspace ScrollableTabBar.xcworkspace \
             -scheme ScrollableTabBarCI \
             -destination "${DESTINATION}" \
@@ -42,14 +48,33 @@ jobs:
             -testLanguage en \
             -testRegion US \
             -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-Workspace" \
+            -resultBundlePath "${RUNNER_TEMP}/ScrollableTabBar-Build.xcresult"
+
+      - name: Wait for the test Simulator
+        run: python3 .github/scripts/simulator.py wait
+
+      - name: Run prepared tests
+        run: |
+          products="${RUNNER_TEMP}/ScrollableTabBar-Workspace/Build/Products"
+          manifests=("${products}"/*.xctestrun)
+          test "${#manifests[@]}" -eq 1
+          xcodebuild test-without-building \
+            -xctestrun "${manifests[0]}" \
+            -destination "${DESTINATION}" \
+            -enableCodeCoverage NO \
+            -parallel-testing-enabled NO \
+            -testLanguage en \
+            -testRegion US \
             -resultBundlePath "${RUNNER_TEMP}/ScrollableTabBar-Workspace.xcresult"
 
-      - name: Upload failed test results
+      - name: Upload failed build and test results
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-results
-          path: ${{ runner.temp }}/ScrollableTabBar-Workspace.xcresult
+          path: |
+            ${{ runner.temp }}/ScrollableTabBar-Build.xcresult
+            ${{ runner.temp }}/ScrollableTabBar-Workspace.xcresult
           if-no-files-found: ignore
           retention-days: 7
           include-hidden-files: true
@@ -64,3 +89,7 @@ jobs:
             -destination "${DESTINATION}" \
             -derivedDataPath "${RUNNER_TEMP}/ScrollableTabBar-Workspace" \
             CODE_SIGNING_ALLOWED=NO
+
+      - name: Clean up the test Simulator
+        if: always()
+        run: python3 .github/scripts/simulator.py cleanup

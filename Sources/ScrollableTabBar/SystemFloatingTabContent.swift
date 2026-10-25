@@ -66,23 +66,22 @@ enum SystemFloatingTabRuntime {
     static func attachModel(from tabs: [UITab], to floatingTabBar: UIView) -> UICollectionView? {
         guard let firstTab = tabs.first else { return nil }
         do {
-            let modelGetter = try ABIRuntime.shared.object(firstTab).resolveMethodAndWait(
-                selector: PrivateUIKitRuntimeNames.itemModelReadSelector,
-                as: (() -> AnyObject?).self
+            let modelGetter = try ABIRuntime.shared.object(firstTab).resolveAndWait(
+                .objc(.method(PrivateUIKitRuntimeNames.itemModelReadSelector, as: (() -> AnyObject?).self))
             )
             guard let model = try unsafe modelGetter.unsafeInvoke() else { return nil }
-            let setModel = try ABIRuntime.shared.object(floatingTabBar).resolveMethodAndWait(
-                selector: PrivateUIKitRuntimeNames.attachedModelWriteSelector,
-                as: ((AnyObject?) -> Void).self
+            let setModel = try ABIRuntime.shared.object(floatingTabBar).resolveAndWait(
+                .objc(.method(
+                    PrivateUIKitRuntimeNames.attachedModelWriteSelector,
+                    as: ((AnyObject?) -> Void).self
+                ))
             )
             try unsafe setModel.unsafeInvoke(model)
-            let sidebar = try ABIRuntime.shared.object(floatingTabBar).resolveMethodAndWait(
-                selector: PrivateUIKitRuntimeNames.sidebarVisibilitySelector,
-                as: (() -> Bool).self
+            let sidebar = try ABIRuntime.shared.object(floatingTabBar).resolveAndWait(
+                .objc(.method(PrivateUIKitRuntimeNames.sidebarVisibilitySelector, as: (() -> Bool).self))
             )
-            let collection = try ABIRuntime.shared.object(floatingTabBar).resolveMethodAndWait(
-                selector: PrivateUIKitRuntimeNames.itemsViewSelector,
-                as: (() -> UICollectionView?).self
+            let collection = try ABIRuntime.shared.object(floatingTabBar).resolveAndWait(
+                .objc(.method(PrivateUIKitRuntimeNames.itemsViewSelector, as: (() -> UICollectionView?).self))
             )
             guard try unsafe !sidebar.unsafeInvoke(),
                 let tabItemsView = try unsafe collection.unsafeInvoke(),
@@ -102,9 +101,11 @@ enum SystemFloatingTabRuntime {
 
     static func detachModel(from floatingTabBar: UIView) {
         do {
-            let setModel = try ABIRuntime.shared.object(floatingTabBar).resolveMethodAndWait(
-                selector: PrivateUIKitRuntimeNames.attachedModelWriteSelector,
-                as: ((AnyObject?) -> Void).self
+            let setModel = try ABIRuntime.shared.object(floatingTabBar).resolveAndWait(
+                .objc(.method(
+                    PrivateUIKitRuntimeNames.attachedModelWriteSelector,
+                    as: ((AnyObject?) -> Void).self
+                ))
             )
             try unsafe setModel.unsafeInvoke(nil)
         } catch {

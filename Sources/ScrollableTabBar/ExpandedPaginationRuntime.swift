@@ -145,9 +145,8 @@ enum ExpandedPaginationRuntime {
 
     static func maximumContainerSize(of floatingTabBar: UIView) -> CGSize? {
         guard
-            let method = try? ABIRuntime.shared.object(floatingTabBar).resolveMethodAndWait(
-                selector: PrivateUIKitRuntimeNames.maximumContainerSizeSelector,
-                as: (() -> CGSize).self
+            let method = try? ABIRuntime.shared.object(floatingTabBar).resolveAndWait(
+                .objc(.method(PrivateUIKitRuntimeNames.maximumContainerSizeSelector, as: (() -> CGSize).self))
             )
         else { return nil }
         return try? unsafe method.unsafeInvoke()
@@ -157,9 +156,11 @@ enum ExpandedPaginationRuntime {
         makeSubclass(of: baseClass, named: expandedFloatingTabBarClassName) { subclass in
             [
                 unsafe .mainActorMethod(
+                    .objc(.method(
+                        PrivateUIKitRuntimeNames.maximumContainerSizeSelector,
+                        as: (() -> CGSize).self
+                    )),
                     on: subclass,
-                    selector: PrivateUIKitRuntimeNames.maximumContainerSizeSelector,
-                    as: (() -> CGSize).self,
                     onFailure: reportHookFailure
                 ) { call in
                     let originalSize = try call.proceed()
@@ -172,16 +173,20 @@ enum ExpandedPaginationRuntime {
                     return CGSize(width: view.bounds.width, height: originalSize.height)
                 },
                 unsafe .mainActorMethod(
-                    on: subclass, selector: #selector(UIView.layoutSubviews),
-                    as: (() -> Void).self, onFailure: reportHookFailure
+                    .objc(.method(#selector(UIView.layoutSubviews), as: (() -> Void).self)),
+                    on: subclass,
+                    onFailure: reportHookFailure
                 ) { call in
                     try call.proceed()
                     synchronizeEdgeEffectVisibility(in: try call.receiver)
                 },
                 unsafe .mainActorMethod(
+                    .objc(.method(
+                        PrivateUIKitRuntimeNames.updateItemContentAlphaSelector,
+                        as: ((NSIndexPath) -> Void).self
+                    )),
                     on: subclass,
-                    selector: PrivateUIKitRuntimeNames.updateItemContentAlphaSelector,
-                    as: ((NSIndexPath) -> Void).self, onFailure: reportHookFailure
+                    onFailure: reportHookFailure
                 ) { call, indexPath in
                     try call.proceed(indexPath)
                     if #available(iOS 26.0, *) {
@@ -189,9 +194,11 @@ enum ExpandedPaginationRuntime {
                     }
                 },
                 unsafe .mainActorMethod(
+                    .objc(.method(
+                        PrivateUIKitRuntimeNames.gestureIndexPathSelector,
+                        as: ((UIGestureRecognizer) -> NSIndexPath?).self
+                    )),
                     on: subclass,
-                    selector: PrivateUIKitRuntimeNames.gestureIndexPathSelector,
-                    as: ((UIGestureRecognizer) -> NSIndexPath?).self,
                     onFailure: reportHookFailure
                 ) { call, gesture in
                     if let original = try call.proceed(gesture) { return original }
@@ -205,11 +212,10 @@ enum ExpandedPaginationRuntime {
                     return indexPath as NSIndexPath
                 },
                 unsafe .mainActorMethod(
-                    on: subclass,
-                    selector: #selector(
+                    .objc(.method(#selector(
                         UIScrollViewDelegate.scrollViewWillEndDragging(
-                            _:withVelocity:targetContentOffset:)),
-                    as: ((UIScrollView, CGPoint, UnsafeMutablePointer<CGPoint>) -> Void).self,
+                            _:withVelocity:targetContentOffset:)), as: ((UIScrollView, CGPoint, UnsafeMutablePointer<CGPoint>) -> Void).self)),
+                    on: subclass,
                     onFailure: reportHookFailure
                 ) { call, scrollView, velocity, target in
                     try unsafe call.proceed(scrollView, velocity, target)
@@ -221,18 +227,25 @@ enum ExpandedPaginationRuntime {
 
     private static func makeExpandedCollectionViewClass(baseClass: AnyClass) -> AnyClass? {
         makeSubclass(of: baseClass, named: expandedCollectionViewClassName) { subclass in
-            let originalContentOffset = try ABIRuntime.shared.resolveObjCImplementationAndWait(
-                on: baseClass, selector: PrivateUIKitRuntimeNames.contentOffsetForPageSelector,
-                as: ((Int) -> CGPoint).self
+            let originalContentOffset = try ABIRuntime.shared.resolveAndWait(
+                .objc(.imp(
+                    PrivateUIKitRuntimeNames.contentOffsetForPageSelector,
+                    as: ((Int) -> CGPoint).self
+                )),
+                on: baseClass
             )
-            let currentPage = try ABIRuntime.shared.resolveObjCMethodAndWait(
-                on: baseClass, selector: PrivateUIKitRuntimeNames.currentPageSelector,
-                as: (() -> CGFloat).self
+            let currentPage = try ABIRuntime.shared.resolveAndWait(
+                .objc(.method(PrivateUIKitRuntimeNames.currentPageSelector, as: (() -> CGFloat).self)),
+                on: baseClass
             )
             return [
                 unsafe .mainActorMethod(
-                    on: subclass, selector: PrivateUIKitRuntimeNames.pageViewportWidthSelector,
-                    as: ((CGFloat) -> CGFloat).self, onFailure: reportHookFailure
+                    .objc(.method(
+                        PrivateUIKitRuntimeNames.pageViewportWidthSelector,
+                        as: ((CGFloat) -> CGFloat).self
+                    )),
+                    on: subclass,
+                    onFailure: reportHookFailure
                 ) { call, progress in
                     let originalWidth = try call.proceed(progress)
                     guard let collectionView = try call.receiver as? UICollectionView,
@@ -242,8 +255,12 @@ enum ExpandedPaginationRuntime {
                     return width
                 },
                 unsafe .mainActorMethod(
-                    on: subclass, selector: PrivateUIKitRuntimeNames.contentOffsetForPageSelector,
-                    as: ((Int) -> CGPoint).self, onFailure: reportHookFailure
+                    .objc(.method(
+                        PrivateUIKitRuntimeNames.contentOffsetForPageSelector,
+                        as: ((Int) -> CGPoint).self
+                    )),
+                    on: subclass,
+                    onFailure: reportHookFailure
                 ) { call, page in
                     let originalOffset = try call.proceed(page)
                     guard let collectionView = try call.receiver as? UICollectionView else {
@@ -257,9 +274,12 @@ enum ExpandedPaginationRuntime {
                     )
                 },
                 unsafe .mainActorMethod(
+                    .objc(.method(
+                        PrivateUIKitRuntimeNames.pageProgressForContentOffsetSelector,
+                        as: ((CGPoint, Bool) -> CGFloat).self
+                    )),
                     on: subclass,
-                    selector: PrivateUIKitRuntimeNames.pageProgressForContentOffsetSelector,
-                    as: ((CGPoint, Bool) -> CGFloat).self, onFailure: reportHookFailure
+                    onFailure: reportHookFailure
                 ) { call, offset, clamped in
                     guard let collectionView = try call.receiver as? UICollectionView,
                         let progress = pageProgress(
@@ -271,8 +291,9 @@ enum ExpandedPaginationRuntime {
                     return progress
                 },
                 unsafe .mainActorMethod(
-                    on: subclass, selector: #selector(setter: UIView.frame),
-                    as: ((CGRect) -> Void).self, onFailure: reportHookFailure
+                    .objc(.method(#selector(setter: UIView.frame), as: ((CGRect) -> Void).self)),
+                    on: subclass,
+                    onFailure: reportHookFailure
                 ) { call, proposedFrame in
                     guard let collectionView = try call.receiver as? UICollectionView else {
                         return try call.proceed(proposedFrame)
@@ -294,8 +315,12 @@ enum ExpandedPaginationRuntime {
                     collectionView.center = CGPoint(x: frame.midX, y: frame.midY)
                 },
                 unsafe .mainActorMethod(
-                    on: subclass, selector: #selector(setter: UIScrollView.contentInset),
-                    as: ((UIEdgeInsets) -> Void).self, onFailure: reportHookFailure
+                    .objc(.method(
+                        #selector(setter: UIScrollView.contentInset),
+                        as: ((UIEdgeInsets) -> Void).self
+                    )),
+                    on: subclass,
+                    onFailure: reportHookFailure
                 ) { call, proposedInset in
                     // The page mapping owns the horizontal range. System safe-area
                     // adjustments remain in adjustedContentInset.
@@ -331,13 +356,17 @@ enum ExpandedPaginationRuntime {
         let leftEdgeEffect = collectionView.leftEdgeEffect
         let rightEdgeEffect = collectionView.rightEdgeEffect
         do {
-            let leftGeometry = try ABIRuntime.shared.object(leftEdgeEffect).resolveMethodAndWait(
-                selector: PrivateUIKitRuntimeNames.edgeEffectGeometryViewWriteSelector,
-                as: ((UIView?) -> Void).self
+            let leftGeometry = try ABIRuntime.shared.object(leftEdgeEffect).resolveAndWait(
+                .objc(.method(
+                    PrivateUIKitRuntimeNames.edgeEffectGeometryViewWriteSelector,
+                    as: ((UIView?) -> Void).self
+                ))
             )
-            let rightGeometry = try ABIRuntime.shared.object(rightEdgeEffect).resolveMethodAndWait(
-                selector: PrivateUIKitRuntimeNames.edgeEffectGeometryViewWriteSelector,
-                as: ((UIView?) -> Void).self
+            let rightGeometry = try ABIRuntime.shared.object(rightEdgeEffect).resolveAndWait(
+                .objc(.method(
+                    PrivateUIKitRuntimeNames.edgeEffectGeometryViewWriteSelector,
+                    as: ((UIView?) -> Void).self
+                ))
             )
             try unsafe leftGeometry.unsafeInvoke(leftArrowButton)
             try unsafe rightGeometry.unsafeInvoke(rightArrowButton)
@@ -417,21 +446,24 @@ enum ExpandedPaginationRuntime {
         guard let interaction = edgeEffectInteraction(in: collectionView) else { return false }
         do {
             let type: AnyClass = type(of: interaction)
-            _ = try ABIRuntime.shared.resolveObjCMethodAndWait(
-                on: type, selector: PrivateUIKitRuntimeNames.edgeEffectUpdateSelector,
-                as: (() -> Void).self
+            _ = try ABIRuntime.shared.resolveAndWait(
+                .objc(.method(PrivateUIKitRuntimeNames.edgeEffectUpdateSelector, as: (() -> Void).self)),
+                on: type
             )
-            _ = try ABIRuntime.shared.resolveObjCMethodAndWait(
-                on: type, selector: PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector,
-                as: ((UInt) -> UIView?).self
+            _ = try ABIRuntime.shared.resolveAndWait(
+                .objc(.method(
+                    PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector,
+                    as: ((UInt) -> UIView?).self
+                )),
+                on: type
             )
-            _ = try ABIRuntime.shared.resolveObjCMethodAndWait(
-                on: type, selector: PrivateUIKitRuntimeNames.edgeEffectViewSelector,
-                as: (() -> UIView?).self
+            _ = try ABIRuntime.shared.resolveAndWait(
+                .objc(.method(PrivateUIKitRuntimeNames.edgeEffectViewSelector, as: (() -> UIView?).self)),
+                on: type
             )
-            _ = try ABIRuntime.shared.resolveObjCMethodAndWait(
-                on: type, selector: PrivateUIKitRuntimeNames.edgeCaptureViewSelector,
-                as: (() -> UIView?).self
+            _ = try ABIRuntime.shared.resolveAndWait(
+                .objc(.method(PrivateUIKitRuntimeNames.edgeCaptureViewSelector, as: (() -> UIView?).self)),
+                on: type
             )
             return true
         } catch { return false }
@@ -515,8 +547,9 @@ enum ExpandedPaginationRuntime {
         makeSubclass(of: baseClass, named: className) { subclass in
             [
                 unsafe .mainActorMethod(
-                    on: subclass, selector: #selector(setter: UIView.frame),
-                    as: ((CGRect) -> Void).self, onFailure: reportHookFailure
+                    .objc(.method(#selector(setter: UIView.frame), as: ((CGRect) -> Void).self)),
+                    on: subclass,
+                    onFailure: reportHookFailure
                 ) { call, proposedFrame in
                     let frame =
                         if let view = try call.receiver as? UIView {
@@ -564,9 +597,11 @@ enum ExpandedPaginationRuntime {
               let floatingTabBar = object as? UIView,
               let collectionView = collectionView(in: floatingTabBar),
             let interaction = edgeEffectInteraction(in: collectionView),
-            let forcePocket = try? ABIRuntime.shared.object(interaction).resolveMethodAndWait(
-                selector: PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector,
-                as: ((UInt) -> UIView?).self
+            let forcePocket = try? ABIRuntime.shared.object(interaction).resolveAndWait(
+                .objc(.method(
+                    PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector,
+                    as: ((UInt) -> UIView?).self
+                ))
             )
         else { return false }
         for edge: UIRectEdge in [.left, .right] {
@@ -812,8 +847,9 @@ enum ExpandedPaginationRuntime {
             subclass in
             var requests = [
                 unsafe NativeObjCHookRequest.mainActorMethod(
-                    on: subclass, selector: #selector(setter: UIView.frame),
-                    as: ((CGRect) -> Void).self, onFailure: reportHookFailure
+                    .objc(.method(#selector(setter: UIView.frame), as: ((CGRect) -> Void).self)),
+                    on: subclass,
+                    onFailure: reportHookFailure
                 ) { call, proposedFrame in
                     let frame =
                         if let pocket = try call.receiver as? UIView {
@@ -826,8 +862,9 @@ enum ExpandedPaginationRuntime {
             if #unavailable(iOS 27.0) {
                 requests.append(
                     unsafe .mainActorMethod(
-                        on: subclass, selector: #selector(UIView.layoutSubviews),
-                        as: (() -> Void).self, onFailure: reportHookFailure
+                        .objc(.method(#selector(UIView.layoutSubviews), as: (() -> Void).self)),
+                        on: subclass,
+                        onFailure: reportHookFailure
                     ) { call in
                         try call.proceed()
                         if let pocket = try call.receiver as? UIView {
@@ -1017,9 +1054,9 @@ enum ExpandedPaginationRuntime {
         guard let runtimeClass = object_getClass(collectionView),
             let baseClass = class_getSuperclass(runtimeClass)
         else { return nil }
-        return try? ABIRuntime.shared.resolveObjCImplementationAndWait(
-            on: baseClass, selector: PrivateUIKitRuntimeNames.contentOffsetForPageSelector,
-            as: ((Int) -> CGPoint).self
+        return try? ABIRuntime.shared.resolveAndWait(
+            .objc(.imp(PrivateUIKitRuntimeNames.contentOffsetForPageSelector, as: ((Int) -> CGPoint).self)),
+            on: baseClass
         )
     }
 
@@ -1378,8 +1415,9 @@ enum ExpandedPaginationRuntime {
         -> Value?
     {
         guard
-            let getter = try? ABIRuntime.shared.object(object).resolveMethodAndWait(
-                selector: selector, as: (() -> Value).self)
+            let getter = try? ABIRuntime.shared.object(object).resolveAndWait(
+                .objc(.method(selector, as: (() -> Value).self))
+            )
         else {
             return nil
         }

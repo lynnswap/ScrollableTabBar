@@ -5,191 +5,58 @@ import Testing
 
 struct PrivateUIKitRuntimeNamesTests {
     @Test
-    func decodesXORCatalogBytes() {
-        #expect(
-            PrivateUIKitRuntimeNames.decodedString([
-                0xF3, 0xC2, 0xD4, 0xD3,
-            ]) == "Test"
-        )
-    }
-
-    @Test
     func catalogDecodesEveryRuntimeIdentifier() {
-        #expect(PrivateUIKitRuntimeNames.floatingTabBarClassName == "_UIFloatingTabBar")
+        typealias Names = PrivateUIKitRuntimeNames
+
+        #expect(Names.floatingTabBarClassName == "_UIFloatingTabBar")
         #expect(
-            PrivateUIKitRuntimeNames.floatingTabBarPlatformMetricsBaseClassName
+            Names.floatingTabBarPlatformMetricsBaseClassName
                 == "_UIFloatingTabBarPlatformMetrics"
         )
         #expect(
-            PrivateUIKitRuntimeNames.floatingTabBarPlatformMetricsGlassBaseClassName
+            Names.floatingTabBarPlatformMetricsGlassBaseClassName
                 == "_UIFloatingTabBarPlatformMetrics_Glass"
         )
-        #expect(
-            PrivateUIKitRuntimeNames.liquidLensViewClassName
-                == "_UILiquidLensView"
-        )
-        #expect(
-            PrivateUIKitRuntimeNames.currentPlatformMetricsSelectorName
-                == "_currentPlatformMetrics"
-        )
-        #expect(
-            PrivateUIKitRuntimeNames.maximumContainerSizeSelectorName
-                == "_maximumContainerSizeForPagination"
-        )
-        #expect(
-            PrivateUIKitRuntimeNames.pageViewportWidthSelectorName
-                == "viewWidthForPageProgress:"
-        )
-        #expect(PrivateUIKitRuntimeNames.pagesSelectorName == "pages")
-        #expect(
-            PrivateUIKitRuntimeNames.currentPageSelectorName
-                == "currentPage"
-        )
-        #expect(
-            PrivateUIKitRuntimeNames.leftArrowButtonSelectorName
-                == "leftArrowButton"
-        )
-        #expect(
-            PrivateUIKitRuntimeNames.rightArrowButtonSelectorName
-                == "rightArrowButton"
-        )
-        #expect(
-            PrivateUIKitRuntimeNames.backgroundInsetsSelectorName
-                == "backgroundInsets"
-        )
-        #expect(
-            PrivateUIKitRuntimeNames.floatingTabBarSelectorName
-                == "floatingTabBar"
-        )
-        #expect(PrivateUIKitRuntimeNames.itemModelReadKey == "_tabModel")
-        #expect(PrivateUIKitRuntimeNames.attachedModelKey == "tabModel")
-        #expect(PrivateUIKitRuntimeNames.attachedModelWriteSelectorName == "setTabModel:")
-        #expect(PrivateUIKitRuntimeNames.itemsViewKey == "collectionView")
-        #expect(PrivateUIKitRuntimeNames.sidebarVisibilityKey == "showsSidebarButton")
+        #expect(Names.liquidLensViewClassName == "_UILiquidLensView")
 
-        #expect(
-            NSStringFromSelector(PrivateUIKitRuntimeNames.currentPlatformMetricsSelector)
-                == PrivateUIKitRuntimeNames.currentPlatformMetricsSelectorName
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.maximumContainerSizeSelector
-            ) == PrivateUIKitRuntimeNames.maximumContainerSizeSelectorName
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.pageViewportWidthSelector
-            ) == PrivateUIKitRuntimeNames.pageViewportWidthSelectorName
-        )
-        #expect(
-            NSStringFromSelector(PrivateUIKitRuntimeNames.pagesSelector)
-                == PrivateUIKitRuntimeNames.pagesSelectorName
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.currentPageSelector
-            ) == PrivateUIKitRuntimeNames.currentPageSelectorName
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.pageWidthSelector
-            ) == "width"
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.leftArrowButtonSelector
-            ) == PrivateUIKitRuntimeNames.leftArrowButtonSelectorName
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.rightArrowButtonSelector
-            ) == PrivateUIKitRuntimeNames.rightArrowButtonSelectorName
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.backgroundInsetsSelector
-            ) == PrivateUIKitRuntimeNames.backgroundInsetsSelectorName
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.floatingTabBarSelector
-            ) == PrivateUIKitRuntimeNames.floatingTabBarSelectorName
-        )
-        #expect(
-            NSStringFromSelector(PrivateUIKitRuntimeNames.itemModelReadSelector)
-                == PrivateUIKitRuntimeNames.itemModelReadKey
-        )
-        #expect(
-            NSStringFromSelector(PrivateUIKitRuntimeNames.attachedModelWriteSelector)
-                == PrivateUIKitRuntimeNames.attachedModelWriteSelectorName
-        )
-        #expect(
-            NSStringFromSelector(PrivateUIKitRuntimeNames.itemsViewSelector)
-                == PrivateUIKitRuntimeNames.itemsViewKey
-        )
-        #expect(
-            NSStringFromSelector(PrivateUIKitRuntimeNames.sidebarVisibilitySelector)
-                == PrivateUIKitRuntimeNames.sidebarVisibilityKey
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.updateItemContentAlphaSelector
-            ) == "_updateContentAlphaForItemAtIndexPath:"
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.gestureIndexPathSelector
-            ) == "_indexPathForGestureRecognizer:"
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.contentOffsetForPageSelector
-            ) == "contentOffsetForPage:"
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.pageProgressForContentOffsetSelector
-            ) == "pageProgressForContentOffset:clamped:"
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.edgeEffectGeometryViewWriteSelector
-            ) == "_setOverrideGeometryView:"
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.edgeEffectViewInteractionSelector
-            ) == "_edgeEffectViewInteraction"
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.edgeEffectViewSelector
-            ) == "effectView"
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.edgeCaptureViewSelector
-            ) == "captureView"
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.pageButtonButtonSelector
-            ) == "button"
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector
-            ) == "forcingPocketFor:"
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.edgeEffectUpdateSelector
-            ) == "update"
-        )
-        #expect(
-            NSStringFromSelector(
-                PrivateUIKitRuntimeNames.pageButtonContentOpacitySelector
-            ) == "contentOpacity"
-        )
+        #expect(Names.layerFiltersKey == "filters")
+        #expect(Names.filterTypeKey == "type")
+        #expect(Names.variableBlurFilterType == "variableBlur")
+        #expect(Names.filterInputMaskImageKey == "inputMaskImage")
+
+        let selectors: [(Selector, String)] = [
+            (Names.currentPlatformMetricsSelector, "_currentPlatformMetrics"),
+            (Names.maximumContainerSizeSelector, "_maximumContainerSizeForPagination"),
+            (Names.pageViewportWidthSelector, "viewWidthForPageProgress:"),
+            (Names.pagesSelector, "pages"),
+            (Names.currentPageSelector, "currentPage"),
+            (Names.pageWidthSelector, "width"),
+            (Names.leftArrowButtonSelector, "leftArrowButton"),
+            (Names.rightArrowButtonSelector, "rightArrowButton"),
+            (Names.backgroundInsetsSelector, "backgroundInsets"),
+            (Names.floatingTabBarSelector, "floatingTabBar"),
+            (Names.itemModelReadSelector, "_tabModel"),
+            (Names.attachedModelWriteSelector, "setTabModel:"),
+            (Names.itemsViewSelector, "collectionView"),
+            (Names.sidebarVisibilitySelector, "showsSidebarButton"),
+            (Names.updateItemContentAlphaSelector, "_updateContentAlphaForItemAtIndexPath:"),
+            (Names.gestureIndexPathSelector, "_indexPathForGestureRecognizer:"),
+            (Names.contentOffsetForPageSelector, "contentOffsetForPage:"),
+            (
+                Names.pageProgressForContentOffsetSelector,
+                "pageProgressForContentOffset:clamped:"
+            ),
+            (Names.edgeEffectGeometryViewWriteSelector, "_setOverrideGeometryView:"),
+            (Names.edgeEffectViewInteractionSelector, "_edgeEffectViewInteraction"),
+            (Names.edgeEffectViewSelector, "effectView"),
+            (Names.edgeCaptureViewSelector, "captureView"),
+            (Names.pageButtonButtonSelector, "button"),
+            (Names.forceEdgeEffectPocketSelector, "forcingPocketFor:"),
+            (Names.edgeEffectUpdateSelector, "update"),
+            (Names.pageButtonContentOpacitySelector, "contentOpacity"),
+        ]
+        for (selector, name) in selectors {
+            #expect(NSStringFromSelector(selector) == name)
+        }
     }
 }

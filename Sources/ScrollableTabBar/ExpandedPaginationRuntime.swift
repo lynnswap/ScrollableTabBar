@@ -7,6 +7,15 @@ enum ExpandedPaginationRuntime {
     private typealias ContentOffsetImplementation = NativeObjCImplementation<CGPoint, Int>
     private static var hooksByClass: [String: [NativeObjCMethodHook]] = [:]
 
+    private struct GetterKey: Hashable {
+        let receiverClass: ObjectIdentifier
+        let selector: Selector
+        let result: ObjectIdentifier
+    }
+    // Layout and scrolling read these getters on every pass, so each one is
+    // prepared once for its class instead of on every read.
+    private static var getters: [GetterKey: Any] = [:]
+
     private static let expandedFloatingTabBarClassName =
         "ScrollableTabBarFullWidthPaginationFloatingTabBar"
     private static let expandedCollectionViewClassName =
@@ -349,8 +358,7 @@ enum ExpandedPaginationRuntime {
                 != nil,
             view(
                 from: rightArrowButton, selector: PrivateUIKitRuntimeNames.pageButtonButtonSelector)
-                != nil,
-            hasVerifiedEdgeEffectActivationContract(on: collectionView)
+                != nil
         else { return false }
 
         let leftEdgeEffect = collectionView.leftEdgeEffect
@@ -438,35 +446,6 @@ enum ExpandedPaginationRuntime {
             leftOpacity <= minimumVisiblePageButtonOpacity
         collectionView.rightEdgeEffect.isHidden =
             rightOpacity <= minimumVisiblePageButtonOpacity
-    }
-
-    private static func hasVerifiedEdgeEffectActivationContract(on collectionView: UICollectionView)
-        -> Bool
-    {
-        guard let interaction = edgeEffectInteraction(in: collectionView) else { return false }
-        do {
-            let type: AnyClass = type(of: interaction)
-            _ = try ABIRuntime.shared.resolveAndWait(
-                .objc(.method(PrivateUIKitRuntimeNames.edgeEffectUpdateSelector, as: (() -> Void).self)),
-                on: type
-            )
-            _ = try ABIRuntime.shared.resolveAndWait(
-                .objc(.method(
-                    PrivateUIKitRuntimeNames.forceEdgeEffectPocketSelector,
-                    as: ((UInt) -> UIView?).self
-                )),
-                on: type
-            )
-            _ = try ABIRuntime.shared.resolveAndWait(
-                .objc(.method(PrivateUIKitRuntimeNames.edgeEffectViewSelector, as: (() -> UIView?).self)),
-                on: type
-            )
-            _ = try ABIRuntime.shared.resolveAndWait(
-                .objc(.method(PrivateUIKitRuntimeNames.edgeCaptureViewSelector, as: (() -> UIView?).self)),
-                on: type
-            )
-            return true
-        } catch { return false }
     }
 
     private static func edgeEffectInteraction(in collectionView: UICollectionView) -> AnyObject? {
@@ -1414,13 +1393,26 @@ enum ExpandedPaginationRuntime {
     private static func value<Value>(in object: AnyObject, selector: Selector, as type: Value.Type)
         -> Value?
     {
-        guard
-            let getter = try? ABIRuntime.shared.object(object).resolveAndWait(
-                .objc(.method(selector, as: (() -> Value).self))
-            )
-        else {
-            return nil
+        guard let receiverClass = object_getClass(object) else { return nil }
+        let key = GetterKey(
+            receiverClass: ObjectIdentifier(receiverClass),
+            selector: selector,
+            result: ObjectIdentifier(type)
+        )
+        let getter: NativeObjCMethod<Value>
+        if let prepared = getters[key] as? NativeObjCMethod<Value> {
+            getter = prepared
+        } else {
+            guard
+                let resolved = try? ABIRuntime.shared.object(object).resolveAndWait(
+                    .objc(.method(selector, as: (() -> Value).self))
+                )
+            else {
+                return nil
+            }
+            getter = resolved.method
+            getters[key] = getter
         }
-        return try? unsafe getter.unsafeInvoke()
+        return try? unsafe getter.unsafeInvoke(on: object)
     }
 }

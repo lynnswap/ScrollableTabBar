@@ -146,7 +146,7 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
             UITraitHorizontalSizeClass.self,
             UITraitPreferredContentSizeCategory.self,
         ]) { (self: ScrollableTabBar, _) in
-            self.invalidateIntrinsicContentSize()
+            self.updateFittingSize()
         }
         renderContent()
     }
@@ -224,7 +224,30 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
             accessibilityLabel: accessibilityLabel,
             accessibilityIdentifier: accessibilityIdentifier
         )
+        updateFittingSize()
+    }
+
+    public override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if window != nil { updateNavigationTitleViewSize() }
+    }
+
+    private func updateFittingSize() {
         invalidateIntrinsicContentSize()
+        updateNavigationTitleViewSize()
+    }
+
+    private func updateNavigationTitleViewSize() {
+        // A frame-based navigation title view keeps its initial width when its intrinsic size changes.
+        guard translatesAutoresizingMaskIntoConstraints else { return }
+        var ancestor = superview
+        while let view = ancestor {
+            if let bar = view as? UINavigationBar, bar.topItem?.titleView === self {
+                bounds.size = intrinsicContentSize
+                return
+            }
+            ancestor = view.superview
+        }
     }
 
     private func connectSelectionHandler() {

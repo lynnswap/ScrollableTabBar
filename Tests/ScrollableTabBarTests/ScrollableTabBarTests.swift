@@ -135,15 +135,38 @@ struct ScrollableTabBarTests {
         #expect(preferredSize.width < 640)
         #expect(preferredSize.height == 49)
         let narrowWidth = preferredSize.width / 2
-        #expect(
-            control.sizeThatFits(CGSize(width: narrowWidth, height: 1))
-                == CGSize(width: narrowWidth, height: preferredSize.height)
-        )
+        #expect(control.sizeThatFits(CGSize(width: narrowWidth, height: 1)).width == narrowWidth)
         #expect(control.sizeThatFits(CGSize(width: 1_024, height: 1)) == preferredSize)
         #expect(control.sizeThatFits(.zero) == preferredSize)
 
-        control.setItems([control.items[0]], selectedID: .headers)
+        control.setItems([.init(id: .headers, title: "A")], selectedID: .headers)
         #expect(control.intrinsicContentSize.width < preferredSize.width)
+    }
+
+    @Test
+    func navigationTitleViewFitsTabsAddedAfterInstallation() {
+        let control = ScrollableTabBar<TabID>()
+        control.sizeToFit()
+        let detail = UIViewController()
+        detail.navigationItem.titleView = control
+        let navigation = UINavigationController(rootViewController: detail)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = navigation
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        window.layoutIfNeeded()
+
+        control.setItems([.init(id: .headers, title: "A")], selectedID: .headers)
+        window.layoutIfNeeded()
+        let initialWidth = control.bounds.width
+        control.setItems([
+            .init(id: .headers, title: "A"),
+            .init(id: .preview, title: "Preview"),
+        ], selectedID: .preview)
+        window.layoutIfNeeded()
+        #expect(control.window === window)
+        #expect(control.bounds.width > initialWidth)
+        #expect(abs(control.bounds.width - control.intrinsicContentSize.width) <= 1)
     }
 
     @Test

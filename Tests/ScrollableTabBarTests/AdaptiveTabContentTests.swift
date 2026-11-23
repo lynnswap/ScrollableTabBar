@@ -118,7 +118,7 @@ struct AdaptiveTabContentTests {
         content.adaptiveView.layoutIfNeeded()
         #expect(content.widthThatFits(640) == fittingWidth)
         #expect(activeHeight > scrollableTabBarMinimumHeight)
-        #expect(content.intrinsicHeight == activeHeight)
+        #expect(content.intrinsicHeight == content.menuButton.intrinsicContentSize.height)
         #expect(
             content.heightThatFits(CGSize(width: 240, height: 1))
                 >= activeHeight

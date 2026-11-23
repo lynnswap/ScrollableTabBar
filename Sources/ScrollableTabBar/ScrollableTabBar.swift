@@ -141,12 +141,12 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
         setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         setContentHuggingPriority(.defaultLow, for: .horizontal)
         addSubview(content.view)
-        connectSelectionHandler()
+        connectContent()
         registerForTraitChanges([
             UITraitHorizontalSizeClass.self,
             UITraitPreferredContentSizeCategory.self,
         ]) { (self: ScrollableTabBar, _) in
-            self.updateFittingSize()
+            if self.content is SystemFloatingTabContent { self.updateFittingSize() }
         }
         renderContent()
     }
@@ -243,14 +243,17 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
         var ancestor = superview
         while let view = ancestor {
             if let bar = view as? UINavigationBar, bar.topItem?.titleView === self {
-                bounds.size = intrinsicContentSize
+                bounds.size = sizeThatFits(CGSize(width: Self.preferredMaximumWidth, height: bounds.height))
                 return
             }
             ancestor = view.superview
         }
     }
 
-    private func connectSelectionHandler() {
+    private func connectContent() {
+        if let adaptive = content as? AdaptiveTabContent {
+            adaptive.adaptiveView.presentationDidChange = { [weak self] in self?.updateFittingSize() }
+        }
         content.selectionHandler = { [weak self] id in
             guard let id = id.base as? ID else { return }
             self?.didSelectItem(id: id)
@@ -262,7 +265,7 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
         content.view.removeFromSuperview()
         content = newContent
         addSubview(content.view)
-        connectSelectionHandler()
+        connectContent()
     }
 
     private static func indices(for items: [Item], selectedID: ID?) -> [ID: Int] {

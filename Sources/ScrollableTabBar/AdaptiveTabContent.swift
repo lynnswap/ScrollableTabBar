@@ -87,7 +87,12 @@ final class AdaptiveTabContent: ScrollableTabBarContent {
 
     func widthThatFits(_ maximumWidth: CGFloat) -> CGFloat {
         // A zero-width title view is omitted by older navigation bars, even when items arrive later.
-        min(items.isEmpty ? 1 : adaptiveView.intrinsicContentSize.width, maximumWidth)
+        guard !items.isEmpty else { return min(1, maximumWidth) }
+        let width = switch adaptiveView.presentation {
+        case .segmented: segmentedControl.intrinsicContentSize.width
+        case .menu: menuButton.sizeThatFits(UIView.layoutFittingExpandedSize).width
+        }
+        return min(width, maximumWidth)
     }
 
     func heightThatFits(_ size: CGSize) -> CGFloat {
@@ -112,6 +117,7 @@ final class AdaptiveTabView: UIView {
         case menu
     }
 
+    var presentationDidChange: (() -> Void)?
     private(set) var presentation: Presentation
     private let segmentedControl: UISegmentedControl
     private let menuButton: UIButton
@@ -147,10 +153,7 @@ final class AdaptiveTabView: UIView {
     }
 
     override var intrinsicContentSize: CGSize {
-        switch presentation {
-        case .segmented: segmentedControl.intrinsicContentSize
-        case .menu: menuButton.sizeThatFits(UIView.layoutFittingExpandedSize)
-        }
+        activeControl.intrinsicContentSize
     }
 
     override func sizeThatFits(_ size: CGSize) -> CGSize {
@@ -179,5 +182,6 @@ final class AdaptiveTabView: UIView {
         segmentedControl.isHidden = presentation != .segmented
         menuButton.isHidden = presentation != .menu
         invalidateIntrinsicContentSize()
+        presentationDidChange?()
     }
 }

@@ -167,6 +167,10 @@ struct ScrollableTabBarTests {
         #expect(control.window === window)
         #expect(control.bounds.width > initialWidth)
         #expect(abs(control.bounds.width - control.intrinsicContentSize.width) <= 1)
+
+        control.traitOverrides.horizontalSizeClass = .regular
+        window.layoutIfNeeded()
+        #expect(abs(control.bounds.width - control.intrinsicContentSize.width) <= 1)
     }
 
     @Test

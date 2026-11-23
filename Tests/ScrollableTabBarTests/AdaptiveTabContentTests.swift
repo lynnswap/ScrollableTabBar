@@ -92,7 +92,7 @@ struct AdaptiveTabContentTests {
     }
 
     @Test
-    func adaptiveSizingPreservesTheActiveControlHeight() {
+    func adaptiveSizingFitsTheActiveControl() {
         let content = makeContent()
         content.adaptiveView.traitOverrides.horizontalSizeClass = .compact
         content.adaptiveView.updateTraitsIfNeeded()
@@ -113,6 +113,7 @@ struct AdaptiveTabContentTests {
 
         let activeHeight = content.adaptiveView.intrinsicContentSize.height
 
+        #expect(content.widthThatFits(640) == content.menuButton.intrinsicContentSize.width)
         #expect(activeHeight > scrollableTabBarMinimumHeight)
         #expect(content.intrinsicHeight == activeHeight)
         #expect(

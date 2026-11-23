@@ -85,6 +85,10 @@ final class AdaptiveTabContent: ScrollableTabBarContent {
         adaptiveView.invalidateIntrinsicContentSize()
     }
 
+    func widthThatFits(_ maximumWidth: CGFloat) -> CGFloat {
+        items.isEmpty ? 0 : min(adaptiveView.intrinsicContentSize.width, maximumWidth)
+    }
+
     func heightThatFits(_ size: CGSize) -> CGFloat {
         max(scrollableTabBarMinimumHeight, adaptiveView.sizeThatFits(size).height)
     }

@@ -17,6 +17,7 @@ struct PrivateUIKitRuntimeNamesTests {
             Names.floatingTabBarPlatformMetricsGlassBaseClassName
                 == "_UIFloatingTabBarPlatformMetrics_Glass"
         )
+        #expect(Names.floatingTabBarItemViewClassName == "_UIFloatingTabBarItemView")
         #expect(Names.liquidLensViewClassName == "_UILiquidLensView")
 
         #expect(Names.layerFiltersKey == "filters")
@@ -25,6 +26,7 @@ struct PrivateUIKitRuntimeNamesTests {
         #expect(Names.filterInputMaskImageKey == "inputMaskImage")
 
         let selectors: [(Selector, String)] = [
+            (Names.itemWriteSelector, "setItem:"),
             (Names.currentPlatformMetricsSelector, "_currentPlatformMetrics"),
             (Names.maximumContainerSizeSelector, "_maximumContainerSizeForPagination"),
             (Names.pageViewportWidthSelector, "viewWidthForPageProgress:"),

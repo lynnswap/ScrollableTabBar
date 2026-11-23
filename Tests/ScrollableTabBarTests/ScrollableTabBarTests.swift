@@ -128,20 +128,22 @@ struct ScrollableTabBarTests {
     }
 
     @Test
-    func capsWideSizingAndHonorsNarrowContainerProposals() {
+    func fitsItemsAndHonorsNarrowContainerProposals() {
         let control = makeControl(selectedID: .headers)
-        let preferredSize = CGSize(width: 640, height: 49)
-
-        #expect(control.intrinsicContentSize == preferredSize)
+        let preferredSize = control.intrinsicContentSize
+        #expect(preferredSize.width > 0)
+        #expect(preferredSize.width < 640)
+        #expect(preferredSize.height == 49)
+        let narrowWidth = preferredSize.width / 2
         #expect(
-            control.sizeThatFits(CGSize(width: 314, height: 1))
-                == CGSize(width: 314, height: 49)
+            control.sizeThatFits(CGSize(width: narrowWidth, height: 1))
+                == CGSize(width: narrowWidth, height: preferredSize.height)
         )
-        #expect(
-            control.sizeThatFits(CGSize(width: 1_024, height: 1))
-                == preferredSize
-        )
+        #expect(control.sizeThatFits(CGSize(width: 1_024, height: 1)) == preferredSize)
         #expect(control.sizeThatFits(.zero) == preferredSize)
+
+        control.setItems([control.items[0]], selectedID: .headers)
+        #expect(control.intrinsicContentSize.width < preferredSize.width)
     }
 
     @Test

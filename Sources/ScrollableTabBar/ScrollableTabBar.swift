@@ -15,6 +15,7 @@ protocol ScrollableTabBarContent: AnyObject {
         accessibilityIdentifier: String?
     )
 
+    func widthThatFits(_ maximumWidth: CGFloat) -> CGFloat
     func heightThatFits(_ size: CGSize) -> CGFloat
 }
 
@@ -111,9 +112,6 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
         }
     }
 
-    // The navigation container still owns compression below this component policy.
-    // Capping the preferred width prevents spare title area from becoming empty glass
-    // while retaining overflow as a normal presentation state.
     private static var preferredMaximumWidth: CGFloat { 640 }
 
     private(set) var content: any ScrollableTabBarContent
@@ -175,7 +173,6 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
             replaceContent(AdaptiveTabContent(items: presentationItems))
         }
         renderContent()
-        invalidateIntrinsicContentSize()
         setNeedsLayout()
     }
 
@@ -185,15 +182,13 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
     }
 
     public override var intrinsicContentSize: CGSize {
-        CGSize(width: Self.preferredMaximumWidth, height: content.intrinsicHeight)
+        CGSize(width: content.widthThatFits(Self.preferredMaximumWidth), height: content.intrinsicHeight)
     }
 
     public override func sizeThatFits(_ size: CGSize) -> CGSize {
-        let proposedWidth = size.width > 0 && size.width.isFinite
-            ? min(size.width, Self.preferredMaximumWidth)
-            : Self.preferredMaximumWidth
+        let maximumWidth = size.width > 0 ? min(size.width, Self.preferredMaximumWidth) : Self.preferredMaximumWidth
         return CGSize(
-            width: proposedWidth,
+            width: content.widthThatFits(maximumWidth),
             height: content.heightThatFits(size)
         )
     }
@@ -229,6 +224,7 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
             accessibilityLabel: accessibilityLabel,
             accessibilityIdentifier: accessibilityIdentifier
         )
+        invalidateIntrinsicContentSize()
     }
 
     private func connectSelectionHandler() {

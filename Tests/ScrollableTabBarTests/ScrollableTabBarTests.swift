@@ -162,6 +162,29 @@ struct ScrollableTabBarTests {
     }
 
     @Test
+    func fitsImageTabsAfterLayout() {
+        let control = ScrollableTabBar(items: ["house", "gear", "message"].map {
+            .init(id: $0, title: "Tab", image: UIImage(systemName: $0))
+        }, selectedID: "house")
+        control.sizesToFitContentWidth = true
+        control.translatesAutoresizingMaskIntoConstraints = false
+        let host = UIViewController()
+        host.view.traitOverrides.horizontalSizeClass = .regular
+        host.view.addSubview(control)
+        NSLayoutConstraint.activate([
+            control.centerXAnchor.constraint(equalTo: host.view.centerXAnchor),
+            control.centerYAnchor.constraint(equalTo: host.view.centerYAnchor),
+            control.widthAnchor.constraint(lessThanOrEqualTo: host.view.widthAnchor),
+        ])
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 640, height: 400))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        window.layoutIfNeeded()
+        #expect(abs(control.bounds.width - control.intrinsicContentSize.width) <= 1)
+    }
+
+    @Test
     func updatesItemsAndSelectionTogetherWithoutNotifyingTheDelegate() {
         let control = makeControl(selectedID: .preview)
         let recorder = SelectionRecorder<TabID>()

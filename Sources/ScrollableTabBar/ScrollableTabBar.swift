@@ -104,6 +104,7 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
     /// Set this to `true` to let Auto Layout fit the control to its items within that limit.
     public var sizesToFitContentWidth = false {
         didSet {
+            updateContentSizing()
             invalidateIntrinsicContentSize()
             setNeedsLayout()
         }
@@ -271,7 +272,12 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
         content.view.removeFromSuperview()
         content = newContent
         addSubview(content.view)
+        updateContentSizing()
         connectSelectionHandler()
+    }
+
+    private func updateContentSizing() {
+        (content as? AdaptiveTabContent)?.segmentedControl.fittingContainer = sizesToFitContentWidth ? self : nil
     }
 
     private static func indices(for items: [Item], selectedID: ID?) -> [ID: Int] {

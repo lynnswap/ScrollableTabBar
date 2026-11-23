@@ -8,13 +8,13 @@ final class AdaptiveTabContent: ScrollableTabBarContent {
         max(scrollableTabBarMinimumHeight, adaptiveView.intrinsicContentSize.height)
     }
     let adaptiveView: AdaptiveTabView
-    let segmentedControl: UISegmentedControl
+    let segmentedControl: AdaptiveSegmentedControl
     let menuButton: UIButton
     private var items: [ScrollableTabBarPresentationItem]
 
     init(items: [ScrollableTabBarPresentationItem]) {
         self.items = items
-        segmentedControl = UISegmentedControl(frame: .zero)
+        segmentedControl = AdaptiveSegmentedControl(frame: .zero)
         menuButton = UIButton(type: .system)
         menuButton.showsMenuAsPrimaryAction = true
         adaptiveView = AdaptiveTabView(
@@ -85,6 +85,15 @@ final class AdaptiveTabContent: ScrollableTabBarContent {
         adaptiveView.invalidateIntrinsicContentSize()
     }
 
+    func widthThatFits(_ maximumWidth: CGFloat) -> CGFloat {
+        guard !items.isEmpty else { return 0 }
+        let width = switch adaptiveView.presentation {
+        case .segmented: segmentedControl.intrinsicContentSize.width
+        case .menu: menuButton.sizeThatFits(UIView.layoutFittingExpandedSize).width
+        }
+        return min(width, maximumWidth)
+    }
+
     func heightThatFits(_ size: CGSize) -> CGFloat {
         max(scrollableTabBarMinimumHeight, adaptiveView.sizeThatFits(size).height)
     }
@@ -97,6 +106,17 @@ final class AdaptiveTabContent: ScrollableTabBarContent {
             return
         }
         selectionHandler?(items[segmentedControl.selectedSegmentIndex].id)
+    }
+}
+
+@MainActor
+final class AdaptiveSegmentedControl: UISegmentedControl {
+    weak var fittingContainer: UIView?
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // UIKit can change segment widths once it has laid out their images at the assigned height.
+        fittingContainer?.invalidateIntrinsicContentSize()
     }
 }
 

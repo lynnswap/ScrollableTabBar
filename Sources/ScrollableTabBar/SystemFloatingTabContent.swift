@@ -126,6 +126,7 @@ final class SystemFloatingTabContent: NSObject,
     let tabController: UITabBarController
     private(set) var tabs: [UITab]
     private(set) var tabItemsView: UICollectionView
+    private lazy var measureItem = Self.makeItemMeasurer(in: floatingView.floatingTabBar)
     private var items: [ScrollableTabBarPresentationItem]
     private var renderedIndex: Int?
 
@@ -159,6 +160,22 @@ final class SystemFloatingTabContent: NSObject,
         )
         super.init()
         tabController.delegate = self
+    }
+
+    private static func makeItemMeasurer(in container: UIView) -> ((UITab) throws -> CGFloat)? {
+        guard let viewClass = NSClassFromString(
+            PrivateUIKitRuntimeNames.floatingTabBarItemViewClassName
+        ) as? UIView.Type else { return nil }
+        let view = viewClass.init(frame: .zero)
+        guard let setItem = try? ABIRuntime.shared.object(view).resolveAndWait(
+            .objc(.method(PrivateUIKitRuntimeNames.itemWriteSelector, as: ((UITab) -> Void).self))
+        ) else { return nil }
+        view.isHidden = true
+        container.addSubview(view)
+        return { tab in
+            try unsafe setItem.unsafeInvoke(tab)
+            return view.sizeThatFits(.zero).width
+        }
     }
 
     isolated deinit {
@@ -213,6 +230,20 @@ final class SystemFloatingTabContent: NSObject,
         floatingView.accessibilityLabel = accessibilityLabel
         floatingView.accessibilityIdentifier = accessibilityIdentifier
         for tab in tabs { tab.isEnabled = isEnabled }
+    }
+
+    func widthThatFits(_ maximumWidth: CGFloat) -> CGFloat {
+        // The floating bar accepts the proposed width. Measure its item views without resizing the live scroll viewport.
+        guard let measureItem,
+              let insets = ExpandedPaginationRuntime.backgroundInsets(of: floatingView.floatingTabBar)
+        else { return maximumWidth }
+        var width = insets.left + insets.right
+        for tab in tabs {
+            guard let itemWidth = try? measureItem(tab) else { return maximumWidth }
+            width += itemWidth
+            if width >= maximumWidth { return maximumWidth }
+        }
+        return min(width.rounded(.up), maximumWidth)
     }
 
     func heightThatFits(_ size: CGSize) -> CGFloat {

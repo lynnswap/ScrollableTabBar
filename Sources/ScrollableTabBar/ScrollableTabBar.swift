@@ -15,6 +15,7 @@ protocol ScrollableTabBarContent: AnyObject {
         accessibilityIdentifier: String?
     )
 
+    func widthThatFits(_ maximumWidth: CGFloat) -> CGFloat
     func heightThatFits(_ size: CGSize) -> CGFloat
 }
 
@@ -97,6 +98,18 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
         }
     }
 
+    /// Whether the control requests only the width its content needs.
+    ///
+    /// The default is `false`, which requests the available width up to 640 points.
+    /// Set this to `true` to let Auto Layout fit the control to its items within that limit.
+    public var sizesToFitContentWidth = false {
+        didSet {
+            updateContentSizing()
+            invalidateIntrinsicContentSize()
+            setNeedsLayout()
+        }
+    }
+
     /// The contextual accessibility label propagated to the active presentation.
     public override var accessibilityLabel: String? {
         didSet {
@@ -119,6 +132,7 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
     private(set) var content: any ScrollableTabBarContent
     private var itemIndexByID: [ID: Int]
     private var selectedIDStorage: ID?
+    private var lastLayoutContentSize: CGSize?
 
     /// Creates a tab selector with the supplied items and selection.
     ///
@@ -185,7 +199,7 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
     }
 
     public override var intrinsicContentSize: CGSize {
-        CGSize(width: Self.preferredMaximumWidth, height: content.intrinsicHeight)
+        CGSize(width: fittingWidth(upTo: Self.preferredMaximumWidth), height: content.intrinsicHeight)
     }
 
     public override func sizeThatFits(_ size: CGSize) -> CGSize {
@@ -193,15 +207,26 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
             ? min(size.width, Self.preferredMaximumWidth)
             : Self.preferredMaximumWidth
         return CGSize(
-            width: proposedWidth,
+            width: fittingWidth(upTo: proposedWidth),
             height: content.heightThatFits(size)
         )
+    }
+
+    private func fittingWidth(upTo maximumWidth: CGFloat) -> CGFloat {
+        sizesToFitContentWidth ? content.widthThatFits(maximumWidth) : maximumWidth
     }
 
     public override func layoutSubviews() {
         super.layoutSubviews()
         content.view.frame = bounds
         content.view.layoutIfNeeded()
+        if sizesToFitContentWidth {
+            let size = intrinsicContentSize
+            if lastLayoutContentSize != size {
+                lastLayoutContentSize = size
+                invalidateIntrinsicContentSize()
+            }
+        }
     }
 
     func didSelectItem(id: ID) {
@@ -229,6 +254,10 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
             accessibilityLabel: accessibilityLabel,
             accessibilityIdentifier: accessibilityIdentifier
         )
+        if sizesToFitContentWidth {
+            invalidateIntrinsicContentSize()
+            setNeedsLayout()
+        }
     }
 
     private func connectSelectionHandler() {
@@ -243,7 +272,12 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
         content.view.removeFromSuperview()
         content = newContent
         addSubview(content.view)
+        updateContentSizing()
         connectSelectionHandler()
+    }
+
+    private func updateContentSizing() {
+        (content as? AdaptiveTabContent)?.segmentedControl.fittingContainer = sizesToFitContentWidth ? self : nil
     }
 
     private static func indices(for items: [Item], selectedID: ID?) -> [ID: Int] {

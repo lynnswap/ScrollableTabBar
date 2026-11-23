@@ -1278,6 +1278,14 @@ enum ExpandedPaginationRuntime {
         return minimumOffset...maximumOffset
     }
 
+    static func backgroundInsets(of floatingTabBar: UIView) -> UIEdgeInsets? {
+        guard let metrics = value(
+            in: floatingTabBar, selector: PrivateUIKitRuntimeNames.currentPlatformMetricsSelector,
+            as: AnyObject.self)
+        else { return nil }
+        return value(in: metrics, selector: PrivateUIKitRuntimeNames.backgroundInsetsSelector, as: UIEdgeInsets.self)
+    }
+
     private static func pageViewportWidth(
         for collectionView: UICollectionView,
         pageProgress: CGFloat
@@ -1295,13 +1303,7 @@ enum ExpandedPaginationRuntime {
                 from: floatingTabBar, selector: PrivateUIKitRuntimeNames.leftArrowButtonSelector),
             let rightArrowButton = view(
                 from: floatingTabBar, selector: PrivateUIKitRuntimeNames.rightArrowButtonSelector),
-            let metrics = value(
-                in: floatingTabBar,
-                selector: PrivateUIKitRuntimeNames.currentPlatformMetricsSelector,
-                as: AnyObject.self),
-            let backgroundInsets = value(
-                in: metrics, selector: PrivateUIKitRuntimeNames.backgroundInsetsSelector,
-                as: UIEdgeInsets.self)
+            let backgroundInsets = backgroundInsets(of: floatingTabBar)
         else {
             return nil
         }

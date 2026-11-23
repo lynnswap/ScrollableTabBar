@@ -112,17 +112,11 @@ final class AdaptiveTabContent: ScrollableTabBarContent {
 @MainActor
 final class AdaptiveSegmentedControl: UISegmentedControl {
     weak var fittingContainer: UIView?
-    private var lastIntrinsicWidth: CGFloat?
 
     override func layoutSubviews() {
         super.layoutSubviews()
         // UIKit can change segment widths once it has laid out their images at the assigned height.
-        guard let fittingContainer else { return }
-        let width = intrinsicContentSize.width
-        if width != lastIntrinsicWidth {
-            lastIntrinsicWidth = width
-            fittingContainer.invalidateIntrinsicContentSize()
-        }
+        fittingContainer?.invalidateIntrinsicContentSize()
     }
 }
 

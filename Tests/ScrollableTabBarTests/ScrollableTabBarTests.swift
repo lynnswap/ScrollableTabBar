@@ -182,6 +182,9 @@ struct ScrollableTabBarTests {
         defer { window.isHidden = true }
         window.layoutIfNeeded()
         #expect(abs(control.bounds.width - control.intrinsicContentSize.width) <= 1)
+        control.setItems(control.items, selectedID: "gear")
+        window.layoutIfNeeded()
+        #expect(abs(control.bounds.width - control.intrinsicContentSize.width) <= 1)
     }
 
     @Test

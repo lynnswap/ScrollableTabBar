@@ -7,8 +7,9 @@ runtime contract is available. Otherwise, it uses a public segmented or menu
 presentation while preserving item order, typed selection, enablement, and
 event semantics.
 
-The control sizes its width to fit its content, up to 640 points. Its
-container can give it less space. The number of visible items, continuous scrolling,
+By default the control requests up to 640 points of width. Set
+``sizesToFitContentWidth`` to `true` in an Auto Layout container to fit a short
+row of tabs. Constrain the width to the space available for longer rows. The number of visible items, continuous scrolling,
 arrow placement, pagination width, and exact visual treatment are not API
 guarantees.
 

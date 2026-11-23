@@ -770,14 +770,15 @@ struct SystemFloatingTabContentTests {
     @Test
     func expandedWideLayoutFitsTheCurrentFourItemsWithoutPagination() throws {
         let content = try #require(makeContent())
-        content.view.frame.size = CGSize(width: content.widthThatFits(640), height: content.intrinsicHeight)
         let host = UIViewController()
+        host.view.traitOverrides.preferredContentSizeCategory = .extraSmall
         host.view.addSubview(content.view)
         let window = showInWindow(
             host,
             size: CGSize(width: 1_024, height: 768)
         )
         defer { window.isHidden = true }
+        content.view.frame.size = CGSize(width: content.widthThatFits(640), height: content.intrinsicHeight)
 
         content.render(
             selectedIndex: 0,

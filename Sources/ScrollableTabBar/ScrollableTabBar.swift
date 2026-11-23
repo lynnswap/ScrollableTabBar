@@ -98,6 +98,17 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
         }
     }
 
+    /// Whether the control requests only the width its content needs.
+    ///
+    /// The default is `false`, which requests the available width up to 640 points.
+    /// Set this to `true` to let Auto Layout fit the control to its items within that limit.
+    public var sizesToFitContentWidth = false {
+        didSet {
+            invalidateIntrinsicContentSize()
+            setNeedsLayout()
+        }
+    }
+
     /// The contextual accessibility label propagated to the active presentation.
     public override var accessibilityLabel: String? {
         didSet {
@@ -112,6 +123,9 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
         }
     }
 
+    // The navigation container still owns compression below this component policy.
+    // Capping the preferred width prevents spare title area from becoming empty glass
+    // while retaining overflow as a normal presentation state.
     private static var preferredMaximumWidth: CGFloat { 640 }
 
     private(set) var content: any ScrollableTabBarContent
@@ -148,7 +162,6 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
             UITraitPreferredContentSizeCategory.self,
         ]) { (self: ScrollableTabBar, _) in
             self.invalidateIntrinsicContentSize()
-            self.setNeedsLayout()
         }
         renderContent()
     }
@@ -175,6 +188,7 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
             replaceContent(AdaptiveTabContent(items: presentationItems))
         }
         renderContent()
+        invalidateIntrinsicContentSize()
         setNeedsLayout()
     }
 
@@ -184,26 +198,33 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
     }
 
     public override var intrinsicContentSize: CGSize {
-        CGSize(width: content.widthThatFits(Self.preferredMaximumWidth), height: content.intrinsicHeight)
+        CGSize(width: fittingWidth(upTo: Self.preferredMaximumWidth), height: content.intrinsicHeight)
     }
 
     public override func sizeThatFits(_ size: CGSize) -> CGSize {
-        let maximumWidth = size.width > 0 ? min(size.width, Self.preferredMaximumWidth) : Self.preferredMaximumWidth
+        let proposedWidth = size.width > 0 && size.width.isFinite
+            ? min(size.width, Self.preferredMaximumWidth)
+            : Self.preferredMaximumWidth
         return CGSize(
-            width: content.widthThatFits(maximumWidth),
+            width: fittingWidth(upTo: proposedWidth),
             height: content.heightThatFits(size)
         )
+    }
+
+    private func fittingWidth(upTo maximumWidth: CGFloat) -> CGFloat {
+        sizesToFitContentWidth ? content.widthThatFits(maximumWidth) : maximumWidth
     }
 
     public override func layoutSubviews() {
         super.layoutSubviews()
         content.view.frame = bounds
         content.view.layoutIfNeeded()
-        let contentSize = intrinsicContentSize
-        if lastLayoutContentSize != contentSize {
-            lastLayoutContentSize = contentSize
-            invalidateIntrinsicContentSize()
-            updateNavigationTitleViewSize()
+        if sizesToFitContentWidth {
+            let size = intrinsicContentSize
+            if lastLayoutContentSize != size {
+                lastLayoutContentSize = size
+                invalidateIntrinsicContentSize()
+            }
         }
     }
 
@@ -232,26 +253,9 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
             accessibilityLabel: accessibilityLabel,
             accessibilityIdentifier: accessibilityIdentifier
         )
-        invalidateIntrinsicContentSize()
-        setNeedsLayout()
-    }
-
-    public override func didMoveToWindow() {
-        super.didMoveToWindow()
-        lastLayoutContentSize = nil
-        setNeedsLayout()
-    }
-
-    private func updateNavigationTitleViewSize() {
-        // A frame-based navigation title view keeps its initial width when its intrinsic size changes.
-        guard translatesAutoresizingMaskIntoConstraints else { return }
-        var ancestor = superview
-        while let view = ancestor {
-            if let bar = view as? UINavigationBar, bar.topItem?.titleView === self {
-                bounds.size = sizeThatFits(CGSize(width: Self.preferredMaximumWidth, height: bounds.height))
-                return
-            }
-            ancestor = view.superview
+        if sizesToFitContentWidth {
+            invalidateIntrinsicContentSize()
+            setNeedsLayout()
         }
     }
 

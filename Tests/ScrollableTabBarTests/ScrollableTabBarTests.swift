@@ -128,8 +128,26 @@ struct ScrollableTabBarTests {
     }
 
     @Test
+    func capsWideSizingAndHonorsNarrowContainerProposals() {
+        let control = makeControl(selectedID: .headers)
+        let preferredSize = CGSize(width: 640, height: 49)
+
+        #expect(control.intrinsicContentSize == preferredSize)
+        #expect(
+            control.sizeThatFits(CGSize(width: 314, height: 1))
+                == CGSize(width: 314, height: 49)
+        )
+        #expect(
+            control.sizeThatFits(CGSize(width: 1_024, height: 1))
+                == preferredSize
+        )
+        #expect(control.sizeThatFits(.zero) == preferredSize)
+    }
+
+    @Test
     func fitsItemsAndHonorsNarrowContainerProposals() {
         let control = makeControl(selectedID: .headers)
+        control.sizesToFitContentWidth = true
         let preferredSize = control.intrinsicContentSize
         #expect(preferredSize.width > 0)
         #expect(preferredSize.width < 640)
@@ -141,36 +159,6 @@ struct ScrollableTabBarTests {
 
         control.setItems([.init(id: .headers, title: "A")], selectedID: .headers)
         #expect(control.intrinsicContentSize.width < preferredSize.width)
-    }
-
-    @Test
-    func navigationTitleViewFitsTabsAddedAfterInstallation() {
-        let control = ScrollableTabBar<TabID>()
-        control.sizeToFit()
-        let detail = UIViewController()
-        detail.navigationItem.titleView = control
-        let navigation = UINavigationController(rootViewController: detail)
-        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
-        window.rootViewController = navigation
-        window.makeKeyAndVisible()
-        defer { window.isHidden = true }
-        window.layoutIfNeeded()
-
-        control.setItems([.init(id: .headers, title: "A")], selectedID: .headers)
-        window.layoutIfNeeded()
-        let initialWidth = control.bounds.width
-        control.setItems([
-            .init(id: .headers, title: "A"),
-            .init(id: .preview, title: "Preview"),
-        ], selectedID: .preview)
-        window.layoutIfNeeded()
-        #expect(control.window === window)
-        #expect(control.bounds.width > initialWidth)
-        #expect(abs(control.bounds.width - control.intrinsicContentSize.width) <= 1)
-
-        control.traitOverrides.horizontalSizeClass = .regular
-        window.layoutIfNeeded()
-        #expect(abs(control.bounds.width - control.intrinsicContentSize.width) <= 1)
     }
 
     @Test

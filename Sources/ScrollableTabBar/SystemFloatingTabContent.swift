@@ -126,7 +126,7 @@ final class SystemFloatingTabContent: NSObject,
     let tabController: UITabBarController
     private(set) var tabs: [UITab]
     private(set) var tabItemsView: UICollectionView
-    private let measureItem: ((UITab) throws -> CGFloat)?
+    private lazy var measureItem = Self.makeItemMeasurer(in: floatingView.floatingTabBar)
     private var items: [ScrollableTabBarPresentationItem]
     private var renderedIndex: Int?
 
@@ -158,7 +158,6 @@ final class SystemFloatingTabContent: NSObject,
             floatingTabBar: components.floatingTabBar,
             tabController: components.tabController
         )
-        measureItem = Self.makeItemMeasurer(in: floatingView)
         super.init()
         tabController.delegate = self
     }

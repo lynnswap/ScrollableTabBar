@@ -86,8 +86,7 @@ final class AdaptiveTabContent: ScrollableTabBarContent {
     }
 
     func widthThatFits(_ maximumWidth: CGFloat) -> CGFloat {
-        // A zero-width title view is omitted by older navigation bars, even when items arrive later.
-        guard !items.isEmpty else { return min(1, maximumWidth) }
+        guard !items.isEmpty else { return 0 }
         let width = switch adaptiveView.presentation {
         case .segmented: segmentedControl.intrinsicContentSize.width
         case .menu: menuButton.sizeThatFits(UIView.layoutFittingExpandedSize).width

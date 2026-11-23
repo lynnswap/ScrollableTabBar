@@ -117,7 +117,6 @@ final class AdaptiveTabView: UIView {
         case menu
     }
 
-    var presentationDidChange: (() -> Void)?
     private(set) var presentation: Presentation
     private let segmentedControl: UISegmentedControl
     private let menuButton: UIButton
@@ -182,6 +181,5 @@ final class AdaptiveTabView: UIView {
         segmentedControl.isHidden = presentation != .segmented
         menuButton.isHidden = presentation != .menu
         invalidateIntrinsicContentSize()
-        presentationDidChange?()
     }
 }

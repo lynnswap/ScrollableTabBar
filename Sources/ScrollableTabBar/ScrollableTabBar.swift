@@ -117,6 +117,7 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
     private(set) var content: any ScrollableTabBarContent
     private var itemIndexByID: [ID: Int]
     private var selectedIDStorage: ID?
+    private var lastLayoutContentSize: CGSize?
 
     /// Creates a tab selector with the supplied items and selection.
     ///
@@ -141,12 +142,13 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
         setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         setContentHuggingPriority(.defaultLow, for: .horizontal)
         addSubview(content.view)
-        connectContent()
+        connectSelectionHandler()
         registerForTraitChanges([
             UITraitHorizontalSizeClass.self,
             UITraitPreferredContentSizeCategory.self,
         ]) { (self: ScrollableTabBar, _) in
-            if self.content is SystemFloatingTabContent { self.updateFittingSize() }
+            self.invalidateIntrinsicContentSize()
+            self.setNeedsLayout()
         }
         renderContent()
     }
@@ -197,6 +199,12 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
         super.layoutSubviews()
         content.view.frame = bounds
         content.view.layoutIfNeeded()
+        let contentSize = intrinsicContentSize
+        if lastLayoutContentSize != contentSize {
+            lastLayoutContentSize = contentSize
+            invalidateIntrinsicContentSize()
+            updateNavigationTitleViewSize()
+        }
     }
 
     func didSelectItem(id: ID) {
@@ -224,17 +232,14 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
             accessibilityLabel: accessibilityLabel,
             accessibilityIdentifier: accessibilityIdentifier
         )
-        updateFittingSize()
+        invalidateIntrinsicContentSize()
+        setNeedsLayout()
     }
 
     public override func didMoveToWindow() {
         super.didMoveToWindow()
-        if window != nil { updateNavigationTitleViewSize() }
-    }
-
-    private func updateFittingSize() {
-        invalidateIntrinsicContentSize()
-        updateNavigationTitleViewSize()
+        lastLayoutContentSize = nil
+        setNeedsLayout()
     }
 
     private func updateNavigationTitleViewSize() {
@@ -250,10 +255,7 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
         }
     }
 
-    private func connectContent() {
-        if let adaptive = content as? AdaptiveTabContent {
-            adaptive.adaptiveView.presentationDidChange = { [weak self] in self?.updateFittingSize() }
-        }
+    private func connectSelectionHandler() {
         content.selectionHandler = { [weak self] id in
             guard let id = id.base as? ID else { return }
             self?.didSelectItem(id: id)
@@ -265,7 +267,7 @@ public final class ScrollableTabBar<ID: Hashable>: UIView {
         content.view.removeFromSuperview()
         content = newContent
         addSubview(content.view)
-        connectContent()
+        connectSelectionHandler()
     }
 
     private static func indices(for items: [Item], selectedID: ID?) -> [ID: Int] {
